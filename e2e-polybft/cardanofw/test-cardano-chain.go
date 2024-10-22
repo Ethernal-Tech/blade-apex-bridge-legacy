@@ -43,7 +43,7 @@ func NewPrimeChainConfig() *TestCardanoChainConfig {
 		ID:                     0,
 		NetworkType:            cardWallet.TestNetNetwork,
 		NodesCount:             4,
-		InitialHotWalletAmount: new(big.Int).SetUint64(defaultFundTokenAmount), // big.NewInt(0),
+		InitialHotWalletAmount: big.NewInt(0),
 		PremineAmount:          defaultPremineAmount,
 		FundAmount:             defaultFundTokenAmount,
 	}
@@ -55,7 +55,7 @@ func NewVectorChainConfig(isEnabled bool) *TestCardanoChainConfig {
 		ID:                     1,
 		NetworkType:            cardWallet.VectorTestNetNetwork,
 		NodesCount:             4,
-		InitialHotWalletAmount: new(big.Int).SetUint64(defaultFundTokenAmount), // big.NewInt(0),
+		InitialHotWalletAmount: big.NewInt(0),
 		PremineAmount:          defaultPremineAmount,
 		FundAmount:             defaultFundTokenAmount,
 	}

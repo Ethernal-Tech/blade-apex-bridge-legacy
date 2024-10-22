@@ -58,7 +58,7 @@ func NewNexusChainConfig(isEnabled bool) *TestEVMChainConfig {
 			Address:     types.ZeroAddress,
 		},
 		ApexConfig:             genesis.ApexConfigNexus,
-		InitialHotWalletAmount: ethgo.Ether(defaultFundEthTokenAmount), // big.NewInt(0),
+		InitialHotWalletAmount: big.NewInt(0),
 		PremineAmount:          ethgo.Ether(defaultPremineEthTokenAmount),
 		FundAmount:             ethgo.Ether(defaultFundEthTokenAmount),
 		FundRelayerAmount:      ethgo.Ether(defaultFundRelayerEthTokenAmount),
