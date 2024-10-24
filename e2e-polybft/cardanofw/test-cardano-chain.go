@@ -96,7 +96,7 @@ func (ec *TestCardanoChain) RunChain(t *testing.T) error {
 
 	networkName := GetNetworkName(ec.config.NetworkType)
 	ogmiosLogsFilePath := filepath.Join("..", "..", "e2e-logs-cardano",
-		fmt.Sprintf("ogmios-%s-%s.log", networkName, strings.ReplaceAll(t.Name(), "/", "_")))
+		fmt.Sprintf("cats-%s-%s.log", networkName, strings.ReplaceAll(t.Name(), "/", "_")))
 
 	cluster, err := NewCardanoTestCluster(
 		WithID(ec.config.ID+1),
@@ -120,7 +120,7 @@ func (ec *TestCardanoChain) RunChain(t *testing.T) error {
 		return err
 	}
 
-	if err := cluster.StartOgmios(ec.config.ID, GetLogsFile(t, ogmiosLogsFilePath, false)); err != nil {
+	if err := cluster.StartCats(ec.config.ID, ogmiosLogsFilePath); err != nil {
 		return err
 	}
 
@@ -208,7 +208,7 @@ func (ec *TestCardanoChain) FundWallets(ctx context.Context) error {
 	fmt.Printf("%s fee addr funded: %s\n", GetNetworkName(ec.config.NetworkType), txHash)
 
 	// retrieve latest tip
-	tip, err := cardWallet.NewTxProviderOgmios(ec.cluster.OgmiosURL()).GetTip(ctx)
+	tip, err := cardWallet.NewTxProviderOgmios(ec.cluster.CatsURL()).GetTip(ctx)
 	if err != nil {
 		return err
 	}
@@ -237,7 +237,7 @@ func (ec *TestCardanoChain) GetGenerateConfigsParams(indx int) (result []string)
 		getFlag("network-address"), server.NetworkAddress(),
 		getFlag("network-magic"), fmt.Sprint(GetNetworkMagic(ec.config.NetworkType)),
 		getFlag("network-id"), fmt.Sprint(ec.config.NetworkType),
-		getFlag("ogmios-url"), ec.cluster.OgmiosURL(),
+		getFlag("ogmios-url"), ec.cluster.CatsURL(),
 	}
 
 	if ec.config.TTLInc > 0 {
@@ -254,10 +254,10 @@ func (ec *TestCardanoChain) GetGenerateConfigsParams(indx int) (result []string)
 func (ec *TestCardanoChain) PopulateApexSystem(apexSystem *ApexSystem) {
 	chainInfo := CardanoChainInfo{
 		NetworkAddress: ec.cluster.Servers[0].NetworkAddress(),
-		OgmiosURL:      ec.cluster.OgmiosURL(),
+		OgmiosURL:      ec.cluster.CatsURL(),
 		MultisigAddr:   ec.multisigAddr,
 		FeeAddr:        ec.multisigFeeAddr,
-		SocketPath:     ec.cluster.OgmiosServer.SocketPath(),
+		SocketPath:     ec.cluster.CatsServer.SocketPath(),
 		FundBlockHash:  ec.fundBlockHash,
 		FundBlockSlot:  ec.fundBlockSlot,
 	}
@@ -275,7 +275,8 @@ func (ec *TestCardanoChain) ChainID() string {
 }
 
 func (ec *TestCardanoChain) GetAddressBalance(ctx context.Context, addr string) (*big.Int, error) {
-	utxos, err := cardWallet.NewTxProviderOgmios(ec.cluster.OgmiosURL()).GetUtxos(ctx, addr)
+	utxos, err := cardWallet.NewTxProviderCats(
+		ec.cluster.CatsURL(), TestCatsServerAPIKey, "").GetUtxos(ctx, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +335,7 @@ func (ec *TestCardanoChain) SendTx(
 	}
 
 	wallet := cardWallet.NewWallet(cardWallet.GetVerificationKeyFromSigningKey(privateKeyBytes), privateKeyBytes)
-	txProvider := cardWallet.NewTxProviderOgmios(ec.cluster.OgmiosURL())
+	txProvider := cardWallet.NewTxProviderCats(ec.cluster.CatsURL(), TestCatsServerAPIKey, "")
 
 	txHash, err := SendTx(ctx, txProvider, wallet,
 		amount.Uint64(), receiverAddr, ec.config.NetworkType, data)

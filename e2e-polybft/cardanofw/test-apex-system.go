@@ -28,7 +28,7 @@ type CardanoChainInfo struct {
 }
 
 func (ci *CardanoChainInfo) GetTxProvider() cardanowallet.ITxProvider {
-	return cardanowallet.NewTxProviderOgmios(ci.OgmiosURL)
+	return cardanowallet.NewTxProviderCats(ci.OgmiosURL, TestCatsServerAPIKey, "")
 }
 
 type EVMChainInfo struct {

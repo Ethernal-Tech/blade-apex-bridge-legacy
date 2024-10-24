@@ -59,6 +59,12 @@ func ResolveOgmiosBinary(networkID wallet.CardanoNetworkType) string {
 	return tryResolveFromEnv(env, name)
 }
 
+func ResolvEthernalCatsBinary(networkID wallet.CardanoNetworkType) string {
+	const env, name = "ETH_CATS", "ethernal-cats"
+
+	return tryResolveFromEnv(env, name)
+}
+
 func ResolveCardanoNodeBinary(networkID wallet.CardanoNetworkType) string {
 	var env, name string
 

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"os"
 	"path"
@@ -49,9 +48,9 @@ func (c *TestCardanoClusterConfig) Dir(name string) string {
 }
 
 type TestCardanoCluster struct {
-	Config       *TestCardanoClusterConfig
-	Servers      []*TestCardanoServer
-	OgmiosServer *TestOgmiosServer
+	Config     *TestCardanoClusterConfig
+	Servers    []*TestCardanoServer
+	CatsServer *TestCatsServer
 
 	once         sync.Once
 	failCh       chan struct{}
@@ -219,8 +218,8 @@ func (c *TestCardanoCluster) Fail(err error) {
 }
 
 func (c *TestCardanoCluster) Stop() error {
-	if c.OgmiosServer != nil && c.OgmiosServer.IsRunning() {
-		if err := c.OgmiosServer.Stop(); err != nil {
+	if c.CatsServer != nil && c.CatsServer.IsRunning() {
+		if err := c.CatsServer.Stop(); err != nil {
 			return err
 		}
 	}
@@ -249,8 +248,8 @@ func (c *TestCardanoCluster) Stop() error {
 	return errors.Join(errs...)
 }
 
-func (c *TestCardanoCluster) OgmiosURL() string {
-	return fmt.Sprintf("http://localhost:%d", c.Config.OgmiosPort)
+func (c *TestCardanoCluster) CatsURL() string {
+	return fmt.Sprintf("http://localhost:%d/api", c.Config.OgmiosPort)
 }
 
 func (c *TestCardanoCluster) NetworkAddress() string {
@@ -405,14 +404,15 @@ func (c *TestCardanoCluster) WaitForBlockWithState(
 	})
 }
 
-func (c *TestCardanoCluster) StartOgmios(id int, stdOut io.Writer) error {
-	srv, err := NewOgmiosTestServer(&TestOgmiosServerConfig{
-		ID:         id,
-		ConfigFile: c.Servers[0].config.ConfigFile,
-		NetworkID:  c.Config.NetworkType,
-		Port:       c.Config.OgmiosPort,
-		SocketPath: c.Servers[0].SocketPath(),
-		StdOut:     stdOut,
+func (c *TestCardanoCluster) StartCats(id int, logsFilePath string) error {
+	srv, err := NewTestCatsServer(&TestCatsServerConfig{
+		ID:          id,
+		NetworkType: c.Config.NetworkType,
+		Port:        c.Config.OgmiosPort,
+		SocketPath:  c.Servers[0].SocketPath(),
+		LogsPath:    logsFilePath,
+		ConfigPath:  c.Config.Dir(""),
+		StdOut:      os.Stdout,
 	})
 	if err != nil {
 		return err
@@ -428,7 +428,7 @@ func (c *TestCardanoCluster) StartOgmios(id int, stdOut io.Writer) error {
 		}
 	}(srv.node, c.Config.ID, c.Config.OgmiosPort)
 
-	c.OgmiosServer = srv
+	c.CatsServer = srv
 
 	return err
 }
