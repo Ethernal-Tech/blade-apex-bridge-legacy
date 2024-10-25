@@ -241,23 +241,19 @@ func (ec *TestCardanoChain) GetGenerateConfigsParams(indx int) (result []string)
 }
 
 func (ec *TestCardanoChain) PopulateApexSystem(apexSystem *ApexSystem) {
+	chainInfo := CardanoChainInfo{
+		NetworkAddress: ec.cluster.Servers[0].NetworkAddress(),
+		OgmiosURL:      ec.cluster.OgmiosURL(),
+		MultisigAddr:   ec.multisigAddr,
+		FeeAddr:        ec.multisigFeeAddr,
+		SocketPath:     ec.cluster.OgmiosServer.SocketPath(),
+	}
+
 	switch ec.ChainID() {
 	case ChainIDPrime:
-		apexSystem.PrimeInfo = CardanoChainInfo{
-			NetworkAddress: ec.cluster.Servers[0].NetworkAddress(),
-			OgmiosURL:      ec.cluster.OgmiosURL(),
-			MultisigAddr:   ec.multisigAddr,
-			FeeAddr:        ec.multisigFeeAddr,
-			SocketPath:     ec.cluster.OgmiosServer.SocketPath(),
-		}
+		apexSystem.PrimeInfo = chainInfo
 	case ChainIDVector:
-		apexSystem.VectorInfo = CardanoChainInfo{
-			NetworkAddress: ec.cluster.Servers[0].NetworkAddress(),
-			OgmiosURL:      ec.cluster.OgmiosURL(),
-			MultisigAddr:   ec.multisigAddr,
-			FeeAddr:        ec.multisigFeeAddr,
-			SocketPath:     ec.cluster.OgmiosServer.SocketPath(),
-		}
+		apexSystem.VectorInfo = chainInfo
 	}
 }
 
