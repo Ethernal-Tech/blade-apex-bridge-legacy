@@ -22,6 +22,7 @@ type CardanoChainInfo struct {
 	OgmiosURL      string
 	MultisigAddr   string
 	FeeAddr        string
+	SocketPath     string
 }
 
 func (ci *CardanoChainInfo) GetTxProvider() cardanowallet.ITxProvider {
