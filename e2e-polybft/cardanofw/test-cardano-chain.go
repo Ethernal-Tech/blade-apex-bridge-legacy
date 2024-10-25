@@ -66,6 +66,8 @@ type TestCardanoChain struct {
 	cluster         *TestCardanoCluster
 	multisigAddr    string
 	multisigFeeAddr string
+	fundBlockSlot   uint64
+	fundBlockHash   string
 }
 
 var _ ITestApexChain = (*TestCardanoChain)(nil)
@@ -205,6 +207,15 @@ func (ec *TestCardanoChain) FundWallets(ctx context.Context) error {
 
 	fmt.Printf("%s fee addr funded: %s\n", GetNetworkName(ec.config.NetworkType), txHash)
 
+	// retrieve latest tip
+	tip, err := cardWallet.NewTxProviderOgmios(ec.cluster.OgmiosURL()).GetTip(ctx)
+	if err != nil {
+		return err
+	}
+
+	ec.fundBlockHash = tip.Hash
+	ec.fundBlockSlot = tip.Slot
+
 	return nil
 }
 
@@ -247,6 +258,8 @@ func (ec *TestCardanoChain) PopulateApexSystem(apexSystem *ApexSystem) {
 		MultisigAddr:   ec.multisigAddr,
 		FeeAddr:        ec.multisigFeeAddr,
 		SocketPath:     ec.cluster.OgmiosServer.SocketPath(),
+		FundBlockHash:  ec.fundBlockHash,
+		FundBlockSlot:  ec.fundBlockSlot,
 	}
 
 	switch ec.ChainID() {
