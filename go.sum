@@ -48,8 +48,8 @@ github.com/Ethernal-Tech/blockchain-event-tracker v0.0.0-20240628125004-67308570
 github.com/Ethernal-Tech/blockchain-event-tracker v0.0.0-20240628125004-67308570b6e2/go.mod h1:csuByxgtqkcFqtzU650asqwZIg+gBHBtLjr1BikQLSc=
 github.com/Ethernal-Tech/bn256 v0.0.0-20240711150404-47c82e53dd19 h1:a96KsZz67W/Nn6Kx55A4eaMngFNsm5A5A6MRYF2xu8U=
 github.com/Ethernal-Tech/bn256 v0.0.0-20240711150404-47c82e53dd19/go.mod h1:ikj6EuZ/ISPyR1DYKnqoE5F2geyI3KzVllndxg7vFs8=
-github.com/Ethernal-Tech/cardano-infrastructure v0.0.0-20241025084023-36be6f9489ac h1:P19G8f5dFvU7ZBfKnBLRmB6ZmT3bOd5zR+AyTiuTo5A=
-github.com/Ethernal-Tech/cardano-infrastructure v0.0.0-20241025084023-36be6f9489ac/go.mod h1:7wZEhfp34EOUEO9UzrWnAwA6SN9UYSIM5sUh2vkCm8k=
+github.com/Ethernal-Tech/cardano-infrastructure v0.0.0-20241028082336-75134cfaae6b h1:H5XCHyGlf26OCByRkgsXSh3V9E0QWIMCu2SeqdOKMbk=
+github.com/Ethernal-Tech/cardano-infrastructure v0.0.0-20241028082336-75134cfaae6b/go.mod h1:ZaHhVZBQyUN4kjLDB8IEsKnbhkVApAopHAuTcih6BLQ=
 github.com/Ethernal-Tech/ethgo v0.0.0-20240801172627-47215d9e504c h1:SLZer+L7G+O2VvxD3q/0r3hIpG4Orm0C5uQKSJ98CO4=
 github.com/Ethernal-Tech/ethgo v0.0.0-20240801172627-47215d9e504c/go.mod h1:YEpLAT6sQiFZIkbkRmfDklN9zb+v8O4l8DFGobuiGDY=
 github.com/Ethernal-Tech/merkle-tree v0.0.0-20231213143318-4db9da419e04 h1:DGIOHe3qAeU+mrRLNJ83mJWyH1t5SqN8XvTrwBUAXK4=
@@ -131,8 +131,8 @@ github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+Ce
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kBD4zp0CCIs=
-github.com/blinklabs-io/gouroboros v0.101.0 h1:+5+C76cgyWNlFInp2HQpaGpiUSVt6bH/fUSDSo3VEaw=
-github.com/blinklabs-io/gouroboros v0.101.0/go.mod h1:otpDPTJTU/EVt3J4axaJAA1gF/0UtalSdVxVqXK8Zuk=
+github.com/blinklabs-io/gouroboros v0.102.0 h1:SSw1SW5a/eunPJdwJHARur/dlGdTrLEq5ScRFZjhen0=
+github.com/blinklabs-io/gouroboros v0.102.0/go.mod h1:okgJskD4KXG5itGM95gUl6J+rKbURzaP++HTeCokgkM=
 github.com/blinklabs-io/ouroboros-mock v0.3.4 h1:codPfiI5vLeD6YdhKL5VwYSzy2N3Dsgx6xjcLsqFaJQ=
 github.com/blinklabs-io/ouroboros-mock v0.3.4/go.mod h1:e/wgG1ZYVenroN2XEMXy7DgEfdmP7KXVRHIQKuh8E/0=
 github.com/bradfitz/go-smtpd v0.0.0-20170404230938-deb6d6237625/go.mod h1:HYsPBTaaSFSlLx/70C2HPIMNZpVV8+vt/A+FMnYP11g=
