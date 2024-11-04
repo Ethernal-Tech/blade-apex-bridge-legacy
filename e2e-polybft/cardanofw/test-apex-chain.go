@@ -13,7 +13,7 @@ type ITestApexChain interface {
 	Stop() error
 	CreateWallets(validator *TestApexValidator) error
 	CreateAddresses(bladeAdmin *crypto.ECDSAKey, bridgeURL string) error
-	FundWallets(ctx context.Context) error
+	FundWallets(ctx context.Context, fundAmount *big.Int) error
 	RegisterChain(validator *TestApexValidator) error
 	InitContracts(bridgeAdmin *crypto.ECDSAKey, bridgeURL string) error
 	GetGenerateConfigsParams(indx int) []string
@@ -56,7 +56,7 @@ func (t *TestApexChainDummy) CreateWallets(validator *TestApexValidator) error {
 	return nil
 }
 
-func (t *TestApexChainDummy) FundWallets(ctx context.Context) error {
+func (t *TestApexChainDummy) FundWallets(ctx context.Context, fundAmount *big.Int) error {
 	return nil
 }
 

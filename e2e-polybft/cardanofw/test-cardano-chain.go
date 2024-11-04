@@ -184,14 +184,17 @@ func (ec *TestCardanoChain) CreateAddresses(
 	return nil
 }
 
-func (ec *TestCardanoChain) FundWallets(ctx context.Context) error {
+func (ec *TestCardanoChain) FundWallets(ctx context.Context, fundAmount *big.Int) error {
 	genesisWallet, err := GetGenesisWalletFromCluster(ec.cluster.Config.TmpDir, 1)
 	if err != nil {
 		return err
 	}
 
 	privateKey := hex.EncodeToString(genesisWallet.GetSigningKey())
-	fundAmount := new(big.Int).SetUint64(ec.config.FundAmount)
+
+	if fundAmount == nil || fundAmount.Cmp(big.NewInt(0)) == 0 {
+		fundAmount = new(big.Int).SetUint64(ec.config.FundAmount)
+	}
 
 	txHash, err := ec.SendTx(ctx, privateKey, ec.multisigAddr, fundAmount, nil)
 	if err != nil {

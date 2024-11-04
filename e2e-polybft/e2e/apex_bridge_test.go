@@ -259,54 +259,128 @@ func TestE2E_ApexBridge_BatchRecreated(t *testing.T) {
 	defer timeoutTimer.Stop()
 
 	var (
-		wentFromFailedOnDestinationToIncludedInBatch bool
-		prevStatus                                   string
-		currentStatus                                string
+		timeout bool
 	)
 
 	apiURL, err := apex.GetBridgingAPI()
 	require.NoError(t, err)
 
-	requestURL := fmt.Sprintf(
-		"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
+	_, timeout = waitForIncludedInBatch(ctx, txHash, apiURL, apiKey, false)
 
-	fmt.Printf("Bridging request txHash = %s\n", txHash)
+	require.False(t, timeout)
+}
 
-for_loop:
-	for {
-		select {
-		case <-timeoutTimer.C:
-			fmt.Printf("Timeout\n")
-
-			break for_loop
-		case <-ctx.Done():
-			fmt.Printf("Done\n")
-
-			break for_loop
-		case <-time.After(time.Millisecond * 500):
-		}
-
-		currentState, err := cardanofw.GetBridgingRequestState(ctx, requestURL, apiKey)
-		if err != nil || currentState == nil {
-			continue
-		}
-
-		prevStatus = currentStatus
-		currentStatus = currentState.Status
-
-		if prevStatus != currentStatus {
-			fmt.Printf("currentStatus = %s\n", currentStatus)
-		}
-
-		if prevStatus == "FailedToExecuteOnDestination" &&
-			(currentStatus == "IncludedInBatch" || currentStatus == "SubmittedToDestination") {
-			wentFromFailedOnDestinationToIncludedInBatch = true
-
-			break for_loop
-		}
+func TestE2E_FundAmount(t *testing.T) {
+	if cardanofw.ShouldSkipE2RRedundantTests() {
+		t.Skip()
 	}
 
-	require.True(t, wentFromFailedOnDestinationToIncludedInBatch)
+	const (
+		apiKey           = "test_api_key"
+		userCnt          = 10
+		fundAmountPrime  = 100_000_000
+		fundAmountVector = 100_000_000
+	)
+
+	ctx, cncl := context.WithCancel(context.Background())
+	defer cncl()
+
+	primeConfig, vectorConfig := cardanofw.NewPrimeChainConfig(), cardanofw.NewVectorChainConfig(true)
+	primeConfig.FundAmount = 1_000_000
+	vectorConfig.FundAmount = 1_000_000
+
+	apex := cardanofw.SetupAndRunApexBridge(
+		t, ctx,
+		cardanofw.WithPrimeConfig(primeConfig),
+		cardanofw.WithVectorConfig(vectorConfig),
+		cardanofw.WithAPIKey(apiKey),
+		cardanofw.WithUserCnt(userCnt),
+	)
+
+	defer require.True(t, apex.ApexBridgeProcessesRunning())
+
+	user := apex.Users[userCnt-1]
+
+	fmt.Println("prime user addr: ", user.PrimeAddress)
+	fmt.Println("vector user addr: ", user.VectorAddress)
+	fmt.Println("prime multisig addr: ", apex.PrimeInfo.MultisigAddr)
+	fmt.Println("prime fee addr: ", apex.PrimeInfo.FeeAddr)
+	fmt.Println("vector multisig addr: ", apex.VectorInfo.MultisigAddr)
+	fmt.Println("vector fee addr: ", apex.VectorInfo.FeeAddr)
+
+	//nolint:dupl
+	t.Run("From prime to vector - not enough funds", func(t *testing.T) {
+		const (
+			sendAmount = uint64(5_000_000)
+		)
+
+		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDVector)
+		require.NoError(t, err)
+
+		fmt.Printf("prevAmount %v\n", prevAmount)
+
+		expectedAmount := new(big.Int).SetUint64(sendAmount)
+		expectedAmount.Add(expectedAmount, prevAmount)
+
+		txHash := apex.SubmitBridgingRequest(t, ctx,
+			cardanofw.ChainIDPrime, cardanofw.ChainIDVector,
+			user, new(big.Int).SetUint64(sendAmount), user,
+		)
+
+		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
+
+		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDVector, expectedAmount, 20, time.Second*10)
+		require.Error(t, err)
+
+		require.NoError(t, apex.FundChainWallets(ctx, cardanofw.ChainIDVector, big.NewInt(fundAmountVector)))
+
+		txHash = apex.SubmitBridgingRequest(t, ctx,
+			cardanofw.ChainIDPrime, cardanofw.ChainIDVector,
+			user, new(big.Int).SetUint64(sendAmount), user,
+		)
+
+		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
+
+		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDVector, expectedAmount, 20, time.Second*10)
+		require.NoError(t, err)
+	})
+
+	//nolint:dupl
+	t.Run("From vector to prime - not enough funds", func(t *testing.T) {
+		const (
+			sendAmount = uint64(15_000_000)
+		)
+
+		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDPrime)
+		require.NoError(t, err)
+
+		fmt.Printf("prevAmount %v\n", prevAmount)
+
+		expectedAmount := new(big.Int).SetUint64(sendAmount)
+		expectedAmount.Add(expectedAmount, prevAmount)
+
+		txHash := apex.SubmitBridgingRequest(t, ctx,
+			cardanofw.ChainIDVector, cardanofw.ChainIDPrime,
+			user, new(big.Int).SetUint64(sendAmount), user,
+		)
+
+		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
+
+		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDPrime, expectedAmount, 20, time.Second*10)
+		require.Error(t, err)
+
+		require.NoError(t, apex.FundChainWallets(ctx, cardanofw.ChainIDPrime, big.NewInt(fundAmountPrime)))
+
+		txHash = apex.SubmitBridgingRequest(t, ctx,
+			cardanofw.ChainIDVector, cardanofw.ChainIDPrime,
+			user, new(big.Int).SetUint64(sendAmount), user,
+		)
+
+		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
+
+		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDPrime, expectedAmount, 20, time.Second*10)
+		require.NoError(t, err)
+	})
 }
 
 func TestE2E_ApexBridge_InvalidScenarios(t *testing.T) {
@@ -1616,4 +1690,59 @@ func TestE2E_ApexBridge_ValidScenarios_BigTests(t *testing.T) {
 		fmt.Printf("Vector - Success count: %v. prevAmount: %v. newAmount: %v. expectedAmount: %v\n", succeededCountVector, prevAmountOnVector, newAmountOnVector, expectedAmountOnVector)
 		fmt.Printf("Prime - Success count: %v. prevAmount: %v. newAmount: %v. expectedAmount: %v\n", succeededCountPrime, prevAmountOnPrime, newAmountOnPrime, expectedAmountOnPrime)
 	})
+}
+
+func waitForIncludedInBatch(
+	ctx context.Context, txHash string, apiURL string, apiKey string, breakAfterFail bool,
+) (int, bool) {
+	var (
+		prevStatus           string
+		currentStatus        string
+		failedToExecuteCount int
+		timeout              bool
+	)
+
+	timeoutTimer := time.NewTimer(time.Second * 420)
+	defer timeoutTimer.Stop()
+
+	requestURL := fmt.Sprintf(
+		"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
+
+	for {
+		select {
+		case <-timeoutTimer.C:
+			timeout = true
+
+			fmt.Printf("Timeout\n")
+
+			return failedToExecuteCount, timeout
+		case <-ctx.Done():
+			return failedToExecuteCount, timeout
+		case <-time.After(time.Millisecond * 500):
+		}
+
+		currentState, err := cardanofw.GetBridgingRequestState(ctx, requestURL, apiKey)
+		if err != nil || currentState == nil {
+			continue
+		}
+
+		prevStatus = currentStatus
+		currentStatus = currentState.Status
+
+		if prevStatus != currentStatus {
+			fmt.Printf("currentStatus = %s\n", currentStatus)
+
+			if currentStatus == BatchFailed {
+				failedToExecuteCount++
+
+				if breakAfterFail {
+					return failedToExecuteCount, timeout
+				}
+			}
+
+			if currentStatus == IncludedInBatch && failedToExecuteCount > 0 {
+				return failedToExecuteCount, timeout
+			}
+		}
+	}
 }

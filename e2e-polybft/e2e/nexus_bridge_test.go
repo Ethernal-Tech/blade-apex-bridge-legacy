@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	BatchFailed  = "FailedToExecuteOnDestination"
-	BatchSuccess = "ExecutedOnDestination"
+	BatchFailed     = "FailedToExecuteOnDestination"
+	IncludedInBatch = "IncludedInBatch"
+	BatchSuccess    = "ExecutedOnDestination"
 )
 
 func TestE2E_ApexBridgeWithNexus(t *testing.T) {
@@ -1787,6 +1788,13 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 
 		user := apex.Users[userCnt-1]
 
+		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDPrime)
+		fmt.Printf("Amount before Tx %d\n", prevAmount)
+		require.NoError(t, err)
+
+		expectedAmount := new(big.Int).SetUint64(sendAmountDfm)
+		expectedAmount.Add(expectedAmount, prevAmount)
+
 		txHash := apex.SubmitBridgingRequest(t, ctx,
 			cardanofw.ChainIDPrime, cardanofw.ChainIDNexus,
 			user, new(big.Int).SetUint64(sendAmountDfm), user,
@@ -1802,6 +1810,9 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 
 		require.Equal(t, failedToExecute, 1)
 		require.False(t, timeout)
+
+		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDNexus, expectedAmount, 3, time.Second*10)
+		require.NoError(t, err)
 	})
 
 	//nolint:dupl
@@ -1833,6 +1844,13 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 
 		user := apex.Users[userCnt-1]
 
+		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDPrime)
+		fmt.Printf("Amount before Tx %d\n", prevAmount)
+		require.NoError(t, err)
+
+		expectedAmount := new(big.Int).SetUint64(sendAmountDfm)
+		expectedAmount.Add(expectedAmount, prevAmount)
+
 		txHash := apex.SubmitBridgingRequest(t, ctx,
 			cardanofw.ChainIDPrime, cardanofw.ChainIDNexus,
 			user, new(big.Int).SetUint64(sendAmountDfm), user,
@@ -1848,6 +1866,9 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 
 		require.Equal(t, failedToExecute, 5)
 		require.False(t, timeout)
+
+		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDNexus, expectedAmount, 3, time.Second*10)
+		require.NoError(t, err)
 	})
 
 	t.Run("Test multiple failed batches in a row", func(t *testing.T) {
@@ -1905,7 +1926,7 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 			require.False(t, timeout[i])
 		}
 
-		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDNexus, ethExpectedBalance, 100, time.Second*10)
+		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDNexus, ethExpectedBalance, 20, time.Second*10)
 		require.NoError(t, err)
 	})
 
@@ -1963,7 +1984,116 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 			require.False(t, timeout[i])
 		}
 
-		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDNexus, ethExpectedBalance, 100, time.Second*10)
+		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDNexus, ethExpectedBalance, 3, time.Second*10)
+		require.NoError(t, err)
+	})
+}
+
+func TestE2E_NexusFundAmount(t *testing.T) {
+	if cardanofw.ShouldSkipE2RRedundantTests() {
+		t.Skip()
+	}
+
+	const (
+		apiKey          = "test_api_key"
+		userCnt         = 15
+		fundAmountPrime = 100_000_000
+		fundAmountNexus = 100
+	)
+
+	ctx, cncl := context.WithCancel(context.Background())
+	defer cncl()
+
+	primeConfig := cardanofw.NewPrimeChainConfig()
+	primeConfig.FundAmount = 1_000_000
+
+	nexusConfig := cardanofw.NewNexusChainConfig(true)
+	nexusConfig.FundAmount = big.NewInt(1)
+
+	apex := cardanofw.SetupAndRunApexBridge(
+		t, ctx,
+		cardanofw.WithPrimeConfig(primeConfig),
+		cardanofw.WithNexusConfig(nexusConfig),
+		cardanofw.WithAPIKey(apiKey),
+		cardanofw.WithVectorEnabled(false),
+		cardanofw.WithNexusEnabled(true),
+		cardanofw.WithUserCnt(userCnt),
+	)
+
+	defer require.True(t, apex.ApexBridgeProcessesRunning())
+
+	user := apex.Users[userCnt-1]
+
+	fmt.Println("prime user addr: ", user.PrimeAddress)
+	fmt.Println("nexus user addr: ", user.NexusAddress)
+	fmt.Println("prime multisig addr: ", apex.PrimeInfo.MultisigAddr)
+	fmt.Println("prime fee addr: ", apex.PrimeInfo.FeeAddr)
+	fmt.Println("nexus gateway addr ", apex.NexusInfo.GatewayAddress)
+
+	t.Run("From nexus to prime - not enough funds", func(t *testing.T) {
+		sendAmountDfm, sendAmountWei := convertToEthValues(uint64(5))
+
+		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDPrime)
+		require.NoError(t, err)
+
+		fmt.Printf("prevAmount %v\n", prevAmount)
+
+		expectedAmount := new(big.Int).SetUint64(sendAmountDfm)
+		expectedAmount.Add(expectedAmount, prevAmount)
+
+		txHash := apex.SubmitBridgingRequest(t, ctx,
+			cardanofw.ChainIDNexus, cardanofw.ChainIDPrime,
+			user, sendAmountWei, user,
+		)
+
+		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
+
+		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDPrime, expectedAmount, 20, time.Second*10)
+		require.Error(t, err)
+
+		require.NoError(t, apex.FundChainWallets(ctx, cardanofw.ChainIDPrime, big.NewInt(fundAmountPrime)))
+
+		txHash = apex.SubmitBridgingRequest(t, ctx,
+			cardanofw.ChainIDNexus, cardanofw.ChainIDPrime,
+			user, sendAmountWei, user,
+		)
+
+		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
+
+		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDPrime, expectedAmount, 20, time.Second*10)
+		require.NoError(t, err)
+	})
+
+	t.Run("From prime to nexus - not enough funds", func(t *testing.T) {
+		sendAmountDfm, sendAmountWei := convertToEthValues(uint64(15))
+
+		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDNexus)
+		require.NoError(t, err)
+
+		fmt.Printf("prevAmount %v\n", prevAmount)
+
+		expectedAmount := new(big.Int).Add(sendAmountWei, prevAmount)
+
+		txHash := apex.SubmitBridgingRequest(t, ctx,
+			cardanofw.ChainIDPrime, cardanofw.ChainIDNexus,
+			user, new(big.Int).SetUint64(sendAmountDfm), user,
+		)
+
+		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
+
+		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDNexus, expectedAmount, 20, time.Second*10)
+		require.Error(t, err)
+
+		require.NoError(t, apex.FundChainWallets(ctx, cardanofw.ChainIDNexus, ethgo.Ether(fundAmountNexus)))
+
+		txHash = apex.SubmitBridgingRequest(t, ctx,
+			cardanofw.ChainIDPrime, cardanofw.ChainIDNexus,
+			user, new(big.Int).SetUint64(sendAmountDfm), user,
+		)
+
+		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
+
+		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDNexus, expectedAmount, 20, time.Second*10)
 		require.NoError(t, err)
 	})
 }

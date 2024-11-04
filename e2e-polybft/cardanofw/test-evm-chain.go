@@ -156,19 +156,23 @@ func (ec *TestEVMChain) CreateAddresses(
 	return nil
 }
 
-func (ec *TestEVMChain) FundWallets(ctx context.Context) error {
+func (ec *TestEVMChain) FundWallets(ctx context.Context, fundAmount *big.Int) error {
 	key, err := ec.admin.MarshallPrivateKey()
 	if err != nil {
 		return err
 	}
 
 	_, err = ec.sendTx(
-		ctx, hex.EncodeToString(key), ec.relayerWallet.Address().String(), ec.config.FundRelayerAmount, nil)
+		hex.EncodeToString(key), ec.relayerWallet.Address().String(), ec.config.FundRelayerAmount, nil)
 	if err != nil {
 		return err
 	}
 
-	receipt, err := ec.sendTx(ctx, hex.EncodeToString(key), ec.gatewayAddr.String(), ec.config.FundAmount, nil)
+	if fundAmount == nil || fundAmount.Cmp(big.NewInt(0)) == 0 {
+		fundAmount = ec.config.FundAmount
+	}
+
+	receipt, err := ec.sendTx(hex.EncodeToString(key), ec.gatewayAddr.String(), fundAmount, nil)
 	if err != nil {
 		return err
 	}
@@ -313,7 +317,7 @@ func (ec *TestEVMChain) BridgingRequest(
 func (ec *TestEVMChain) SendTx(
 	ctx context.Context, privateKey string, receiver string, amount *big.Int, data []byte,
 ) (string, error) {
-	rec, err := ec.sendTx(ctx, privateKey, receiver, amount, data)
+	rec, err := ec.sendTx(privateKey, receiver, amount, data)
 	if err != nil {
 		return "", err
 	}
@@ -322,7 +326,7 @@ func (ec *TestEVMChain) SendTx(
 }
 
 func (ec *TestEVMChain) sendTx(
-	ctx context.Context, privateKey string, receiver string, amount *big.Int, data []byte,
+	privateKey string, receiver string, amount *big.Int, data []byte,
 ) (*ethgo.Receipt, error) {
 	privateKeyECDSA, err := crypto.HexToECDSA(privateKey)
 	if err != nil {

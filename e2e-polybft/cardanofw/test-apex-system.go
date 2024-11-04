@@ -209,7 +209,17 @@ func (a *ApexSystem) InitContracts(ctx context.Context) error {
 
 func (a *ApexSystem) FundWallets(ctx context.Context) error {
 	return a.execForEachChain(func(chain ITestApexChain) error {
-		return chain.FundWallets(ctx)
+		return chain.FundWallets(ctx, big.NewInt(0))
+	})
+}
+
+func (a *ApexSystem) FundChainWallets(ctx context.Context, chainID string, fundAmount *big.Int) error {
+	return a.execForEachChain(func(chain ITestApexChain) error {
+		if chain.ChainID() != chainID {
+			return chain.FundWallets(ctx, fundAmount)
+		}
+
+		return nil
 	})
 }
 
