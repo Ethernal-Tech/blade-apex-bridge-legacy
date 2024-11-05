@@ -2077,9 +2077,11 @@ func TestE2E_NexusFundAmount(t *testing.T) {
 
 			fmt.Printf("prevAmount %v\n", prevAmount)
 
-			var expectedAmount *big.Int
-			var sendAmount *big.Int
-			var fundAmount *big.Int
+			var (
+				expectedAmount *big.Int
+				sendAmount     *big.Int
+				fundAmount     *big.Int
+			)
 
 			if tc.toChain == cardanofw.ChainIDNexus {
 				expectedAmount = new(big.Int).Add(sendAmountWei, prevAmount)
@@ -2088,6 +2090,7 @@ func TestE2E_NexusFundAmount(t *testing.T) {
 			} else {
 				expectedAmount = new(big.Int).SetUint64(sendAmountDfm)
 				expectedAmount.Add(expectedAmount, prevAmount)
+
 				sendAmount = new(big.Int).Set(sendAmountWei)
 				fundAmount = new(big.Int).SetUint64(uint64(tc.fundAmount))
 			}
