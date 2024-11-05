@@ -192,7 +192,7 @@ func (ec *TestCardanoChain) FundWallets(ctx context.Context, fundAmount *big.Int
 
 	privateKey := hex.EncodeToString(genesisWallet.GetSigningKey())
 
-	if fundAmount == nil || fundAmount.Cmp(big.NewInt(0)) == 0 {
+	if fundAmount == nil {
 		fundAmount = new(big.Int).SetUint64(ec.config.FundAmount)
 	}
 

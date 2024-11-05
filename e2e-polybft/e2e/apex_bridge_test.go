@@ -304,86 +304,62 @@ func TestE2E_FundAmount(t *testing.T) {
 
 	user := apex.Users[userCnt-1]
 
-	fmt.Println("prime user addr: ", user.PrimeAddress)
-	fmt.Println("vector user addr: ", user.VectorAddress)
-	fmt.Println("prime multisig addr: ", apex.PrimeInfo.MultisigAddr)
-	fmt.Println("prime fee addr: ", apex.PrimeInfo.FeeAddr)
-	fmt.Println("vector multisig addr: ", apex.VectorInfo.MultisigAddr)
-	fmt.Println("vector fee addr: ", apex.VectorInfo.FeeAddr)
+	testCases := []struct {
+		name       string
+		sendAmount *big.Int
+		fromChain  cardanofw.ChainID
+		toChain    cardanofw.ChainID
+		fundAmount int64
+	}{
+		{
+			name:       "From prime to vector - not enough funds",
+			sendAmount: new(big.Int).SetUint64(5_000_000),
+			fromChain:  cardanofw.ChainIDPrime,
+			toChain:    cardanofw.ChainIDVector,
+			fundAmount: fundAmountVector,
+		},
+		{
+			name:       "From vector to prime - not enough funds",
+			sendAmount: new(big.Int).SetUint64(15_000_000),
+			fromChain:  cardanofw.ChainIDVector,
+			toChain:    cardanofw.ChainIDPrime,
+			fundAmount: fundAmountPrime,
+		},
+	}
 
-	//nolint:dupl
-	t.Run("From prime to vector - not enough funds", func(t *testing.T) {
-		const (
-			sendAmount = uint64(5_000_000)
-		)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			prevAmount, err := apex.GetBalance(ctx, user, tc.toChain)
+			require.NoError(t, err)
 
-		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDVector)
-		require.NoError(t, err)
+			fmt.Printf("prevAmount %v\n", prevAmount)
 
-		fmt.Printf("prevAmount %v\n", prevAmount)
+			expectedAmount := new(big.Int).Set(tc.sendAmount)
+			expectedAmount.Add(expectedAmount, prevAmount)
 
-		expectedAmount := new(big.Int).SetUint64(sendAmount)
-		expectedAmount.Add(expectedAmount, prevAmount)
+			txHash := apex.SubmitBridgingRequest(t, ctx,
+				tc.fromChain, tc.toChain,
+				user, tc.sendAmount, user,
+			)
 
-		txHash := apex.SubmitBridgingRequest(t, ctx,
-			cardanofw.ChainIDPrime, cardanofw.ChainIDVector,
-			user, new(big.Int).SetUint64(sendAmount), user,
-		)
+			fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
 
-		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
+			err = apex.WaitForExactAmount(ctx, user, tc.toChain, expectedAmount, 20, time.Second*10)
+			require.Error(t, err)
 
-		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDVector, expectedAmount, 20, time.Second*10)
-		require.Error(t, err)
+			require.NoError(t, apex.FundChainWallets(t, ctx, tc.toChain, big.NewInt(tc.fundAmount)))
 
-		require.NoError(t, apex.FundChainWallets(ctx, cardanofw.ChainIDVector, big.NewInt(fundAmountVector)))
+			txHash = apex.SubmitBridgingRequest(t, ctx,
+				tc.fromChain, tc.toChain,
+				user, tc.sendAmount, user,
+			)
 
-		txHash = apex.SubmitBridgingRequest(t, ctx,
-			cardanofw.ChainIDPrime, cardanofw.ChainIDVector,
-			user, new(big.Int).SetUint64(sendAmount), user,
-		)
+			fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
 
-		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
-
-		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDVector, expectedAmount, 20, time.Second*10)
-		require.NoError(t, err)
-	})
-
-	//nolint:dupl
-	t.Run("From vector to prime - not enough funds", func(t *testing.T) {
-		const (
-			sendAmount = uint64(15_000_000)
-		)
-
-		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDPrime)
-		require.NoError(t, err)
-
-		fmt.Printf("prevAmount %v\n", prevAmount)
-
-		expectedAmount := new(big.Int).SetUint64(sendAmount)
-		expectedAmount.Add(expectedAmount, prevAmount)
-
-		txHash := apex.SubmitBridgingRequest(t, ctx,
-			cardanofw.ChainIDVector, cardanofw.ChainIDPrime,
-			user, new(big.Int).SetUint64(sendAmount), user,
-		)
-
-		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
-
-		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDPrime, expectedAmount, 20, time.Second*10)
-		require.Error(t, err)
-
-		require.NoError(t, apex.FundChainWallets(ctx, cardanofw.ChainIDPrime, big.NewInt(fundAmountPrime)))
-
-		txHash = apex.SubmitBridgingRequest(t, ctx,
-			cardanofw.ChainIDVector, cardanofw.ChainIDPrime,
-			user, new(big.Int).SetUint64(sendAmount), user,
-		)
-
-		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
-
-		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDPrime, expectedAmount, 20, time.Second*10)
-		require.NoError(t, err)
-	})
+			err = apex.WaitForExactAmount(ctx, user, tc.toChain, expectedAmount, 20, time.Second*10)
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestE2E_ApexBridge_InvalidScenarios(t *testing.T) {

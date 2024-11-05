@@ -168,7 +168,7 @@ func (ec *TestEVMChain) FundWallets(ctx context.Context, fundAmount *big.Int) er
 		return err
 	}
 
-	if fundAmount == nil || fundAmount.Cmp(big.NewInt(0)) == 0 {
+	if fundAmount == nil {
 		fundAmount = ec.config.FundAmount
 	}
 

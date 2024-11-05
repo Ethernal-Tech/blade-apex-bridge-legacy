@@ -2011,7 +2011,7 @@ func TestE2E_NexusFundAmount(t *testing.T) {
 
 	const (
 		apiKey          = "test_api_key"
-		userCnt         = 15
+		userCnt         = 10
 		fundAmountPrime = 100_000_000
 		fundAmountNexus = 100
 	)
@@ -2045,72 +2045,76 @@ func TestE2E_NexusFundAmount(t *testing.T) {
 	fmt.Println("prime fee addr: ", apex.PrimeInfo.FeeAddr)
 	fmt.Println("nexus gateway addr ", apex.NexusInfo.GatewayAddress)
 
-	t.Run("From nexus to prime - not enough funds", func(t *testing.T) {
-		sendAmountDfm, sendAmountWei := convertToEthValues(uint64(5))
+	testCases := []struct {
+		name       string
+		sendAmount uint64 // eth
+		fromChain  cardanofw.ChainID
+		toChain    cardanofw.ChainID
+		fundAmount int64
+	}{
+		{
+			name:       "From nexus to prime - not enough funds",
+			sendAmount: 5,
+			fromChain:  cardanofw.ChainIDNexus,
+			toChain:    cardanofw.ChainIDPrime,
+			fundAmount: fundAmountPrime,
+		},
+		{
+			name:       "From prime to nexus - not enough funds",
+			sendAmount: 15,
+			fromChain:  cardanofw.ChainIDPrime,
+			toChain:    cardanofw.ChainIDNexus,
+			fundAmount: fundAmountNexus,
+		},
+	}
 
-		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDPrime)
-		require.NoError(t, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sendAmountDfm, sendAmountWei := convertToEthValues(tc.sendAmount)
 
-		fmt.Printf("prevAmount %v\n", prevAmount)
+			prevAmount, err := apex.GetBalance(ctx, user, tc.toChain)
+			require.NoError(t, err)
 
-		expectedAmount := new(big.Int).SetUint64(sendAmountDfm)
-		expectedAmount.Add(expectedAmount, prevAmount)
+			fmt.Printf("prevAmount %v\n", prevAmount)
 
-		txHash := apex.SubmitBridgingRequest(t, ctx,
-			cardanofw.ChainIDNexus, cardanofw.ChainIDPrime,
-			user, sendAmountWei, user,
-		)
+			var expectedAmount *big.Int
+			var sendAmount *big.Int
+			var fundAmount *big.Int
 
-		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
+			if tc.toChain == cardanofw.ChainIDNexus {
+				expectedAmount = new(big.Int).Add(sendAmountWei, prevAmount)
+				sendAmount = new(big.Int).SetUint64(sendAmountDfm)
+				fundAmount = ethgo.Ether(fundAmountNexus)
+			} else {
+				expectedAmount = new(big.Int).SetUint64(sendAmountDfm)
+				expectedAmount.Add(expectedAmount, prevAmount)
+				sendAmount = new(big.Int).Set(sendAmountWei)
+				fundAmount = new(big.Int).SetUint64(uint64(tc.fundAmount))
+			}
 
-		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDPrime, expectedAmount, 20, time.Second*10)
-		require.Error(t, err)
+			txHash := apex.SubmitBridgingRequest(t, ctx,
+				tc.fromChain, tc.toChain,
+				user, sendAmount, user,
+			)
 
-		require.NoError(t, apex.FundChainWallets(ctx, cardanofw.ChainIDPrime, big.NewInt(fundAmountPrime)))
+			fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
 
-		txHash = apex.SubmitBridgingRequest(t, ctx,
-			cardanofw.ChainIDNexus, cardanofw.ChainIDPrime,
-			user, sendAmountWei, user,
-		)
+			err = apex.WaitForExactAmount(ctx, user, tc.toChain, expectedAmount, 20, time.Second*10)
+			require.Error(t, err)
 
-		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
+			require.NoError(t, apex.FundChainWallets(t, ctx, tc.toChain, fundAmount))
 
-		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDPrime, expectedAmount, 20, time.Second*10)
-		require.NoError(t, err)
-	})
+			txHash = apex.SubmitBridgingRequest(t, ctx,
+				tc.fromChain, tc.toChain,
+				user, sendAmount, user,
+			)
 
-	t.Run("From prime to nexus - not enough funds", func(t *testing.T) {
-		sendAmountDfm, sendAmountWei := convertToEthValues(uint64(15))
+			fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
 
-		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDNexus)
-		require.NoError(t, err)
-
-		fmt.Printf("prevAmount %v\n", prevAmount)
-
-		expectedAmount := new(big.Int).Add(sendAmountWei, prevAmount)
-
-		txHash := apex.SubmitBridgingRequest(t, ctx,
-			cardanofw.ChainIDPrime, cardanofw.ChainIDNexus,
-			user, new(big.Int).SetUint64(sendAmountDfm), user,
-		)
-
-		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
-
-		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDNexus, expectedAmount, 20, time.Second*10)
-		require.Error(t, err)
-
-		require.NoError(t, apex.FundChainWallets(ctx, cardanofw.ChainIDNexus, ethgo.Ether(fundAmountNexus)))
-
-		txHash = apex.SubmitBridgingRequest(t, ctx,
-			cardanofw.ChainIDPrime, cardanofw.ChainIDNexus,
-			user, new(big.Int).SetUint64(sendAmountDfm), user,
-		)
-
-		fmt.Printf("Tx sent. hash: %s. %v - expectedAmount\n", txHash, expectedAmount)
-
-		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDNexus, expectedAmount, 20, time.Second*10)
-		require.NoError(t, err)
-	})
+			err = apex.WaitForExactAmount(ctx, user, tc.toChain, expectedAmount, 20, time.Second*10)
+			require.NoError(t, err)
+		})
+	}
 }
 
 func convertToEthValues(sendAmount uint64) (uint64, *big.Int) {
