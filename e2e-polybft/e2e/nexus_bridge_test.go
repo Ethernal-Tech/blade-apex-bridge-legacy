@@ -2006,7 +2006,7 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 
 func TestE2E_NexusFundAmount(t *testing.T) {
 	if cardanofw.ShouldSkipE2RRedundantTests() {
-		t.Skip()
+		// t.Skip()
 	}
 
 	const (

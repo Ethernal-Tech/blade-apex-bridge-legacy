@@ -275,7 +275,7 @@ func TestE2E_ApexBridge_BatchRecreated(t *testing.T) {
 
 func TestE2E_FundAmount(t *testing.T) {
 	if cardanofw.ShouldSkipE2RRedundantTests() {
-		t.Skip()
+		// t.Skip()
 	}
 
 	const (
