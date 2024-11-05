@@ -19,12 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	BatchFailed     = "FailedToExecuteOnDestination"
-	IncludedInBatch = "IncludedInBatch"
-	BatchSuccess    = "ExecutedOnDestination"
-)
-
 func TestE2E_ApexBridgeWithNexus(t *testing.T) {
 	if cardanofw.ShouldSkipE2RRedundantTests() {
 		t.Skip()
@@ -1600,7 +1594,10 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 		apiURL, err := apex.GetBridgingAPI()
 		require.NoError(t, err)
 
-		failedToExecute, timeout = waitForBatchSuccess(ctx, txHash, apiURL, apiKey, true)
+		requestURL := fmt.Sprintf(
+			"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
+
+		failedToExecute, timeout = cardanofw.WaitForBatchState(ctx, requestURL, apiKey, true, false, cardanofw.BatchStateExecuted)
 
 		require.Equal(t, failedToExecute, 1)
 		require.False(t, timeout)
@@ -1624,7 +1621,7 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 		err = apex.StartRelayer(ctx)
 		require.NoError(t, err)
 
-		failedToExecute, timeout = waitForBatchSuccess(ctx, txHash, apiURL, apiKey, false)
+		failedToExecute, timeout = cardanofw.WaitForBatchState(ctx, requestURL, apiKey, false, false, cardanofw.BatchStateExecuted)
 
 		require.LessOrEqual(t, failedToExecute, 1)
 		require.False(t, timeout)
@@ -1669,7 +1666,10 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 		apiURL, err := apex.GetBridgingAPI()
 		require.NoError(t, err)
 
-		failedToExecute, timeout = waitForBatchSuccess(ctx, txHash, apiURL, apiKey, true)
+		requestURL := fmt.Sprintf(
+			"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
+
+		failedToExecute, timeout = cardanofw.WaitForBatchState(ctx, requestURL, apiKey, true, false, cardanofw.BatchStateExecuted)
 
 		require.Equal(t, failedToExecute, 1)
 		require.False(t, timeout)
@@ -1692,7 +1692,7 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 		err = apex.StartRelayer(ctx)
 		require.NoError(t, err)
 
-		failedToExecute, timeout = waitForBatchSuccess(ctx, txHash, apiURL, apiKey, false)
+		failedToExecute, timeout = cardanofw.WaitForBatchState(ctx, requestURL, apiKey, false, false, cardanofw.BatchStateExecuted)
 
 		require.LessOrEqual(t, failedToExecute, 1)
 		require.False(t, timeout)
@@ -1731,7 +1731,10 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 		apiURL, err := apex.GetBridgingAPI()
 		require.NoError(t, err)
 
-		failedToExecute, timeout = waitForBatchSuccess(ctx, txHash, apiURL, apiKey, true)
+		requestURL := fmt.Sprintf(
+			"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
+
+		failedToExecute, timeout = cardanofw.WaitForBatchState(ctx, requestURL, apiKey, true, false, cardanofw.BatchStateExecuted)
 
 		require.Equal(t, failedToExecute, 1)
 		require.False(t, timeout)
@@ -1753,7 +1756,7 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 		err = apex.StartRelayer(ctx)
 		require.NoError(t, err)
 
-		failedToExecute, timeout = waitForBatchSuccess(ctx, txHash, apiURL, apiKey, false)
+		failedToExecute, timeout = cardanofw.WaitForBatchState(ctx, requestURL, apiKey, false, false, cardanofw.BatchStateExecuted)
 
 		require.LessOrEqual(t, failedToExecute, 1)
 		require.False(t, timeout)
@@ -1806,7 +1809,10 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 		apiURL, err := apex.GetBridgingAPI()
 		require.NoError(t, err)
 
-		failedToExecute, timeout = waitForBatchSuccess(ctx, txHash, apiURL, apiKey, false)
+		requestURL := fmt.Sprintf(
+			"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
+
+		failedToExecute, timeout = cardanofw.WaitForBatchState(ctx, requestURL, apiKey, false, false, cardanofw.BatchStateExecuted)
 
 		require.Equal(t, failedToExecute, 1)
 		require.False(t, timeout)
@@ -1862,7 +1868,10 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 		apiURL, err := apex.GetBridgingAPI()
 		require.NoError(t, err)
 
-		failedToExecute, timeout = waitForBatchSuccess(ctx, txHash, apiURL, apiKey, false)
+		requestURL := fmt.Sprintf(
+			"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
+
+		failedToExecute, timeout = cardanofw.WaitForBatchState(ctx, requestURL, apiKey, false, false, cardanofw.BatchStateExecuted)
 
 		require.Equal(t, failedToExecute, 5)
 		require.False(t, timeout)
@@ -1918,7 +1927,10 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 			fmt.Printf("Tx %v sent. hash: %s\n", i, txHash)
 
 			// Check batch failed
-			failedToExecute[i], timeout[i] = waitForBatchSuccess(ctx, txHash, apiURL, apiKey, false)
+			requestURL := fmt.Sprintf(
+				"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
+
+			failedToExecute[i], timeout[i] = cardanofw.WaitForBatchState(ctx, requestURL, apiKey, false, false, cardanofw.BatchStateExecuted)
 		}
 
 		for i := 0; i < instances; i++ {
@@ -1973,7 +1985,10 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 			fmt.Printf("Tx %v sent. hash: %s\n", i, txHash)
 
 			// Check batch failed
-			failedToExecute[i], timeout[i] = waitForBatchSuccess(ctx, txHash, apiURL, apiKey, false)
+			requestURL := fmt.Sprintf(
+				"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
+
+			failedToExecute[i], timeout[i] = cardanofw.WaitForBatchState(ctx, requestURL, apiKey, false, false, cardanofw.BatchStateExecuted)
 		}
 
 		for i := 0; i < instances; i++ {
@@ -2096,61 +2111,6 @@ func TestE2E_NexusFundAmount(t *testing.T) {
 		err = apex.WaitForExactAmount(ctx, user, cardanofw.ChainIDNexus, expectedAmount, 20, time.Second*10)
 		require.NoError(t, err)
 	})
-}
-
-func waitForBatchSuccess(
-	ctx context.Context, txHash string, apiURL string, apiKey string, breakAfterFail bool,
-) (int, bool) {
-	var (
-		prevStatus           string
-		currentStatus        string
-		failedToExecuteCount int
-		timeout              bool
-	)
-
-	timeoutTimer := time.NewTimer(time.Second * 300)
-	defer timeoutTimer.Stop()
-
-	requestURL := fmt.Sprintf(
-		"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
-
-	for {
-		select {
-		case <-timeoutTimer.C:
-			timeout = true
-
-			fmt.Printf("Timeout\n")
-
-			return failedToExecuteCount, timeout
-		case <-ctx.Done():
-			return failedToExecuteCount, timeout
-		case <-time.After(time.Millisecond * 500):
-		}
-
-		currentState, err := cardanofw.GetBridgingRequestState(ctx, requestURL, apiKey)
-		if err != nil || currentState == nil {
-			continue
-		}
-
-		prevStatus = currentStatus
-		currentStatus = currentState.Status
-
-		if prevStatus != currentStatus {
-			fmt.Printf("currentStatus = %s\n", currentStatus)
-
-			if currentStatus == BatchFailed {
-				failedToExecuteCount++
-
-				if breakAfterFail {
-					return failedToExecuteCount, timeout
-				}
-			}
-
-			if currentStatus == BatchSuccess {
-				return failedToExecuteCount, timeout
-			}
-		}
-	}
 }
 
 func convertToEthValues(sendAmount uint64) (uint64, *big.Int) {

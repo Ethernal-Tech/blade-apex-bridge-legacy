@@ -265,7 +265,10 @@ func TestE2E_ApexBridge_BatchRecreated(t *testing.T) {
 	apiURL, err := apex.GetBridgingAPI()
 	require.NoError(t, err)
 
-	_, timeout = waitForIncludedInBatch(ctx, txHash, apiURL, apiKey, false)
+	requestURL := fmt.Sprintf(
+		"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
+
+	_, timeout = cardanofw.WaitForBatchState(ctx, requestURL, apiKey, false, true, cardanofw.BatchStateIncludedInBatch)
 
 	require.False(t, timeout)
 }
@@ -1690,59 +1693,4 @@ func TestE2E_ApexBridge_ValidScenarios_BigTests(t *testing.T) {
 		fmt.Printf("Vector - Success count: %v. prevAmount: %v. newAmount: %v. expectedAmount: %v\n", succeededCountVector, prevAmountOnVector, newAmountOnVector, expectedAmountOnVector)
 		fmt.Printf("Prime - Success count: %v. prevAmount: %v. newAmount: %v. expectedAmount: %v\n", succeededCountPrime, prevAmountOnPrime, newAmountOnPrime, expectedAmountOnPrime)
 	})
-}
-
-func waitForIncludedInBatch(
-	ctx context.Context, txHash string, apiURL string, apiKey string, breakAfterFail bool,
-) (int, bool) {
-	var (
-		prevStatus           string
-		currentStatus        string
-		failedToExecuteCount int
-		timeout              bool
-	)
-
-	timeoutTimer := time.NewTimer(time.Second * 420)
-	defer timeoutTimer.Stop()
-
-	requestURL := fmt.Sprintf(
-		"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
-
-	for {
-		select {
-		case <-timeoutTimer.C:
-			timeout = true
-
-			fmt.Printf("Timeout\n")
-
-			return failedToExecuteCount, timeout
-		case <-ctx.Done():
-			return failedToExecuteCount, timeout
-		case <-time.After(time.Millisecond * 500):
-		}
-
-		currentState, err := cardanofw.GetBridgingRequestState(ctx, requestURL, apiKey)
-		if err != nil || currentState == nil {
-			continue
-		}
-
-		prevStatus = currentStatus
-		currentStatus = currentState.Status
-
-		if prevStatus != currentStatus {
-			fmt.Printf("currentStatus = %s\n", currentStatus)
-
-			if currentStatus == BatchFailed {
-				failedToExecuteCount++
-
-				if breakAfterFail {
-					return failedToExecuteCount, timeout
-				}
-			}
-
-			if currentStatus == IncludedInBatch && failedToExecuteCount > 0 {
-				return failedToExecuteCount, timeout
-			}
-		}
-	}
 }
