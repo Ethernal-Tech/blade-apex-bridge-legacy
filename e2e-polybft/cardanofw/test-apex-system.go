@@ -17,12 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	BatchStateFailedToExecute = "FailedToExecuteOnDestination"
-	BatchStateIncludedInBatch = "IncludedInBatch"
-	BatchStateExecuted        = "ExecutedOnDestination"
-)
-
 type CardanoChainInfo struct {
 	NetworkAddress string
 	OgmiosURL      string
@@ -573,56 +567,4 @@ func (a *ApexSystem) getChain(chainID string) (ITestApexChain, error) {
 	}
 
 	return nil, fmt.Errorf("unknown chain: %s", chainID)
-}
-
-func WaitForBatchState(
-	ctx context.Context, requestURL string, apiKey string, breakIfFailed bool, failAtLeastOnce bool, batchState string,
-) (int, bool) {
-	var (
-		prevStatus           string
-		currentStatus        string
-		failedToExecuteCount int
-		timeout              bool
-	)
-
-	timeoutTimer := time.NewTimer(time.Second * 300)
-	defer timeoutTimer.Stop()
-
-	for {
-		select {
-		case <-timeoutTimer.C:
-			timeout = true
-
-			fmt.Printf("Timeout\n")
-
-			return failedToExecuteCount, timeout
-		case <-ctx.Done():
-			return failedToExecuteCount, timeout
-		case <-time.After(time.Millisecond * 500):
-		}
-
-		currentState, err := GetBridgingRequestState(ctx, requestURL, apiKey)
-		if err != nil || currentState == nil {
-			continue
-		}
-
-		prevStatus = currentStatus
-		currentStatus = currentState.Status
-
-		if prevStatus != currentStatus {
-			fmt.Printf("currentStatus = %s\n", currentStatus)
-
-			if currentStatus == BatchStateFailedToExecute {
-				failedToExecuteCount++
-
-				if breakIfFailed {
-					return failedToExecuteCount, timeout
-				}
-			}
-
-			if currentStatus == batchState && (!failAtLeastOnce || failedToExecuteCount > 0) {
-				return failedToExecuteCount, timeout
-			}
-		}
-	}
 }

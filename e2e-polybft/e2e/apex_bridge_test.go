@@ -544,9 +544,9 @@ func TestE2E_ApexBridge_InvalidScenarios(t *testing.T) {
 		requestURL := fmt.Sprintf(
 			"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
 
-		_, err = cardanofw.WaitForRequestStates(nil, ctx, requestURL, apiKey, 60)
+		_, err = cardanofw.WaitForRequestStates(ctx, requestURL, apiKey, nil, 60)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "Timeout")
+		require.ErrorContains(t, err, "timeout")
 	})
 
 	t.Run("Submitted invalid metadata - invalid destination", func(t *testing.T) {
