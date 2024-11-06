@@ -275,7 +275,7 @@ func TestE2E_ApexBridge_BatchRecreated(t *testing.T) {
 
 func TestE2E_FundAmount(t *testing.T) {
 	if cardanofw.ShouldSkipE2RRedundantTests() {
-		// t.Skip()
+		t.Skip()
 	}
 
 	const (
@@ -347,7 +347,7 @@ func TestE2E_FundAmount(t *testing.T) {
 			err = apex.WaitForExactAmount(ctx, user, tc.toChain, expectedAmount, 20, time.Second*10)
 			require.Error(t, err)
 
-			require.NoError(t, apex.FundChainWallets(t, ctx, tc.toChain, big.NewInt(tc.fundAmount)))
+			require.NoError(t, apex.FundChainHotWallet(ctx, tc.toChain, big.NewInt(tc.fundAmount)))
 
 			txHash = apex.SubmitBridgingRequest(t, ctx,
 				tc.fromChain, tc.toChain,

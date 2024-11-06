@@ -156,23 +156,15 @@ func (ec *TestEVMChain) CreateAddresses(
 	return nil
 }
 
-func (ec *TestEVMChain) FundWallets(ctx context.Context, fundAmount *big.Int) error {
-	key, err := ec.admin.MarshallPrivateKey()
+func (ec *TestEVMChain) FundWallets(ctx context.Context) error {
+	privateKey := ec.GetAdminPrivateKey()
+
+	_, err := ec.sendTx(privateKey, ec.relayerWallet.Address().String(), ec.config.FundRelayerAmount, nil)
 	if err != nil {
 		return err
 	}
 
-	_, err = ec.sendTx(
-		hex.EncodeToString(key), ec.relayerWallet.Address().String(), ec.config.FundRelayerAmount, nil)
-	if err != nil {
-		return err
-	}
-
-	if fundAmount == nil {
-		fundAmount = ec.config.FundAmount
-	}
-
-	receipt, err := ec.sendTx(hex.EncodeToString(key), ec.gatewayAddr.String(), fundAmount, nil)
+	receipt, err := ec.sendTx(privateKey, ec.gatewayAddr.String(), ec.config.FundAmount, nil)
 	if err != nil {
 		return err
 	}
@@ -323,6 +315,19 @@ func (ec *TestEVMChain) SendTx(
 	}
 
 	return rec.TransactionHash.String(), nil
+}
+
+func (ec *TestEVMChain) GetHotWalletAddress() string {
+	return ec.gatewayAddr.String()
+}
+
+func (ec *TestEVMChain) GetAdminPrivateKey() string {
+	key, err := ec.admin.MarshallPrivateKey()
+	if err != nil {
+		return "invalid_evm_private_key"
+	}
+
+	return hex.EncodeToString(key)
 }
 
 func (ec *TestEVMChain) sendTx(

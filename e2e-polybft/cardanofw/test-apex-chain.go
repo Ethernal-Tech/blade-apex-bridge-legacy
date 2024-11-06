@@ -13,7 +13,7 @@ type ITestApexChain interface {
 	Stop() error
 	CreateWallets(validator *TestApexValidator) error
 	CreateAddresses(bladeAdmin *crypto.ECDSAKey, bridgeURL string) error
-	FundWallets(ctx context.Context, fundAmount *big.Int) error
+	FundWallets(ctx context.Context) error
 	RegisterChain(validator *TestApexValidator) error
 	InitContracts(bridgeAdmin *crypto.ECDSAKey, bridgeURL string) error
 	GetGenerateConfigsParams(indx int) []string
@@ -26,6 +26,8 @@ type ITestApexChain interface {
 	SendTx(
 		ctx context.Context, privateKey string, receiver string, amount *big.Int, data []byte,
 	) (string, error)
+	GetHotWalletAddress() string
+	GetAdminPrivateKey() string
 }
 
 type TestApexChainDummy struct {
@@ -56,7 +58,7 @@ func (t *TestApexChainDummy) CreateWallets(validator *TestApexValidator) error {
 	return nil
 }
 
-func (t *TestApexChainDummy) FundWallets(ctx context.Context, fundAmount *big.Int) error {
+func (t *TestApexChainDummy) FundWallets(ctx context.Context) error {
 	return nil
 }
 
@@ -93,6 +95,14 @@ func (t *TestApexChainDummy) SendTx(
 
 func (t *TestApexChainDummy) Stop() error {
 	return nil
+}
+
+func (t *TestApexChainDummy) GetHotWalletAddress() string {
+	return ""
+}
+
+func (t *TestApexChainDummy) GetAdminPrivateKey() string {
+	return ""
 }
 
 var _ ITestApexChain = (*TestApexChainDummy)(nil)

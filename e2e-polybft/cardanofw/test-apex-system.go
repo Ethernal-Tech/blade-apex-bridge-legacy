@@ -215,14 +215,19 @@ func (a *ApexSystem) InitContracts(ctx context.Context) error {
 
 func (a *ApexSystem) FundWallets(ctx context.Context) error {
 	return a.execForEachChain(func(chain ITestApexChain) error {
-		return chain.FundWallets(ctx, nil)
+		return chain.FundWallets(ctx)
 	})
 }
 
-func (a *ApexSystem) FundChainWallets(t *testing.T, ctx context.Context, chainID string, fundAmount *big.Int) error {
-	t.Helper()
+func (a *ApexSystem) FundChainHotWallet(ctx context.Context, chainID string, amount *big.Int) error {
+	chain, err := a.getChain(chainID)
+	if err != nil {
+		return err
+	}
 
-	return a.GetChainMust(t, chainID).FundWallets(ctx, fundAmount)
+	_, err = chain.SendTx(ctx, chain.GetAdminPrivateKey(), chain.GetHotWalletAddress(), amount, nil)
+
+	return err
 }
 
 func (a *ApexSystem) RegisterChains() error {
@@ -513,58 +518,6 @@ func (a *ApexSystem) GetChainMust(t *testing.T, chainID string) ITestApexChain {
 	return chain
 }
 
-func WaitForBatchState(
-	ctx context.Context, requestURL string, apiKey string, breakIfFailed bool, failAtLeastOnce bool, batchState string,
-) (int, bool) {
-	var (
-		prevStatus           string
-		currentStatus        string
-		failedToExecuteCount int
-		timeout              bool
-	)
-
-	timeoutTimer := time.NewTimer(time.Second * 300)
-	defer timeoutTimer.Stop()
-
-	for {
-		select {
-		case <-timeoutTimer.C:
-			timeout = true
-
-			fmt.Printf("Timeout\n")
-
-			return failedToExecuteCount, timeout
-		case <-ctx.Done():
-			return failedToExecuteCount, timeout
-		case <-time.After(time.Millisecond * 500):
-		}
-
-		currentState, err := GetBridgingRequestState(ctx, requestURL, apiKey)
-		if err != nil || currentState == nil {
-			continue
-		}
-
-		prevStatus = currentStatus
-		currentStatus = currentState.Status
-
-		if prevStatus != currentStatus {
-			fmt.Printf("currentStatus = %s\n", currentStatus)
-
-			if currentStatus == BatchStateFailedToExecute {
-				failedToExecuteCount++
-
-				if breakIfFailed {
-					return failedToExecuteCount, timeout
-				}
-			}
-
-			if currentStatus == batchState && (!failAtLeastOnce || failedToExecuteCount > 0) {
-				return failedToExecuteCount, timeout
-			}
-		}
-	}
-}
-
 func (a *ApexSystem) execForEachChain(handler func(chain ITestApexChain) error) error {
 	errs := make([]error, len(a.chains))
 	wg := &sync.WaitGroup{}
@@ -615,4 +568,56 @@ func (a *ApexSystem) getChain(chainID string) (ITestApexChain, error) {
 	}
 
 	return nil, fmt.Errorf("unknown chain: %s", chainID)
+}
+
+func WaitForBatchState(
+	ctx context.Context, requestURL string, apiKey string, breakIfFailed bool, failAtLeastOnce bool, batchState string,
+) (int, bool) {
+	var (
+		prevStatus           string
+		currentStatus        string
+		failedToExecuteCount int
+		timeout              bool
+	)
+
+	timeoutTimer := time.NewTimer(time.Second * 300)
+	defer timeoutTimer.Stop()
+
+	for {
+		select {
+		case <-timeoutTimer.C:
+			timeout = true
+
+			fmt.Printf("Timeout\n")
+
+			return failedToExecuteCount, timeout
+		case <-ctx.Done():
+			return failedToExecuteCount, timeout
+		case <-time.After(time.Millisecond * 500):
+		}
+
+		currentState, err := GetBridgingRequestState(ctx, requestURL, apiKey)
+		if err != nil || currentState == nil {
+			continue
+		}
+
+		prevStatus = currentStatus
+		currentStatus = currentState.Status
+
+		if prevStatus != currentStatus {
+			fmt.Printf("currentStatus = %s\n", currentStatus)
+
+			if currentStatus == BatchStateFailedToExecute {
+				failedToExecuteCount++
+
+				if breakIfFailed {
+					return failedToExecuteCount, timeout
+				}
+			}
+
+			if currentStatus == batchState && (!failAtLeastOnce || failedToExecuteCount > 0) {
+				return failedToExecuteCount, timeout
+			}
+		}
+	}
 }

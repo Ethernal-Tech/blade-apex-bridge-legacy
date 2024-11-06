@@ -184,17 +184,9 @@ func (ec *TestCardanoChain) CreateAddresses(
 	return nil
 }
 
-func (ec *TestCardanoChain) FundWallets(ctx context.Context, fundAmount *big.Int) error {
-	genesisWallet, err := GetGenesisWalletFromCluster(ec.cluster.Config.TmpDir, 1)
-	if err != nil {
-		return err
-	}
-
-	privateKey := hex.EncodeToString(genesisWallet.GetSigningKey())
-
-	if fundAmount == nil {
-		fundAmount = new(big.Int).SetUint64(ec.config.FundAmount)
-	}
+func (ec *TestCardanoChain) FundWallets(ctx context.Context) error {
+	privateKey := ec.GetAdminPrivateKey()
+	fundAmount := new(big.Int).SetUint64(ec.config.FundAmount)
 
 	txHash, err := ec.SendTx(ctx, privateKey, ec.multisigAddr, fundAmount, nil)
 	if err != nil {
@@ -352,4 +344,17 @@ func (ec *TestCardanoChain) SendTx(
 	}
 
 	return txHash, nil
+}
+
+func (ec *TestCardanoChain) GetHotWalletAddress() string {
+	return ec.multisigAddr
+}
+
+func (ec *TestCardanoChain) GetAdminPrivateKey() string {
+	genesisWallet, err := GetGenesisWalletFromCluster(ec.cluster.Config.TmpDir, 1)
+	if err != nil {
+		return "invalid_cardano_private_key"
+	}
+
+	return hex.EncodeToString(genesisWallet.GetSigningKey())
 }

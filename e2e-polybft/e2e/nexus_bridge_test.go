@@ -2006,7 +2006,7 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 
 func TestE2E_NexusFundAmount(t *testing.T) {
 	if cardanofw.ShouldSkipE2RRedundantTests() {
-		// t.Skip()
+		t.Skip()
 	}
 
 	const (
@@ -2105,7 +2105,7 @@ func TestE2E_NexusFundAmount(t *testing.T) {
 			err = apex.WaitForExactAmount(ctx, user, tc.toChain, expectedAmount, 20, time.Second*10)
 			require.Error(t, err)
 
-			require.NoError(t, apex.FundChainWallets(t, ctx, tc.toChain, fundAmount))
+			require.NoError(t, apex.FundChainHotWallet(ctx, tc.toChain, fundAmount))
 
 			txHash = apex.SubmitBridgingRequest(t, ctx,
 				tc.fromChain, tc.toChain,
