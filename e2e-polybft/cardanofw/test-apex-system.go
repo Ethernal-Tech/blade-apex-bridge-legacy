@@ -225,7 +225,12 @@ func (a *ApexSystem) FundChainHotWallet(ctx context.Context, chainID string, amo
 		return err
 	}
 
-	_, err = chain.SendTx(ctx, chain.GetAdminPrivateKey(), chain.GetHotWalletAddress(), amount, nil)
+	pk, err := chain.GetAdminPrivateKey()
+	if err != nil {
+		return err
+	}
+
+	_, err = chain.SendTx(ctx, pk, chain.GetHotWalletAddress(), amount, nil)
 
 	return err
 }
