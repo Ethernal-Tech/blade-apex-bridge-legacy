@@ -1791,12 +1791,11 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 
 		user := apex.Users[userCnt-1]
 
-		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDPrime)
+		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDNexus)
 		fmt.Printf("Amount before Tx %d\n", prevAmount)
 		require.NoError(t, err)
 
-		expectedAmount := new(big.Int).SetUint64(sendAmountDfm)
-		expectedAmount.Add(expectedAmount, prevAmount)
+		expectedAmount := new(big.Int).Add(sendAmountEth, prevAmount)
 
 		txHash := apex.SubmitBridgingRequest(t, ctx,
 			cardanofw.ChainIDPrime, cardanofw.ChainIDNexus,
@@ -1850,12 +1849,11 @@ func TestE2E_ApexBridgeWithNexus_BatchFailed(t *testing.T) {
 
 		user := apex.Users[userCnt-1]
 
-		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDPrime)
+		prevAmount, err := apex.GetBalance(ctx, user, cardanofw.ChainIDNexus)
 		fmt.Printf("Amount before Tx %d\n", prevAmount)
 		require.NoError(t, err)
 
-		expectedAmount := new(big.Int).SetUint64(sendAmountDfm)
-		expectedAmount.Add(expectedAmount, prevAmount)
+		expectedAmount := new(big.Int).Add(sendAmountEth, prevAmount)
 
 		txHash := apex.SubmitBridgingRequest(t, ctx,
 			cardanofw.ChainIDPrime, cardanofw.ChainIDNexus,
