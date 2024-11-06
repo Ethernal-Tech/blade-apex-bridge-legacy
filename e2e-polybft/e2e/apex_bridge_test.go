@@ -262,13 +262,8 @@ func TestE2E_ApexBridge_BatchRecreated(t *testing.T) {
 		timeout bool
 	)
 
-	apiURL, err := apex.GetBridgingAPI()
-	require.NoError(t, err)
-
-	requestURL := fmt.Sprintf(
-		"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
-
-	_, timeout = cardanofw.WaitForBatchState(ctx, requestURL, apiKey, false, true, cardanofw.BatchStateIncludedInBatch)
+	_, timeout = cardanofw.WaitForBatchState(
+		ctx, apex, cardanofw.ChainIDPrime, txHash, apiKey, false, true, cardanofw.BatchStateIncludedInBatch)
 
 	require.False(t, timeout)
 }
@@ -408,9 +403,7 @@ func TestE2E_ApexBridge_InvalidScenarios(t *testing.T) {
 			apex.PrimeInfo.MultisigAddr, new(big.Int).SetUint64(sendAmount+feeAmount), bridgingRequestMetadata)
 		require.NoError(t, err)
 
-		apiURL, err := apex.GetBridgingAPI()
-		require.NoError(t, err)
-		cardanofw.WaitForInvalidState(t, ctx, apiURL, apiKey, cardanofw.ChainIDPrime, txHash)
+		cardanofw.WaitForInvalidState(t, ctx, apex, cardanofw.ChainIDPrime, txHash, apiKey)
 	})
 
 	t.Run("Multiple submitters don't have enough funds", func(t *testing.T) {
@@ -432,9 +425,7 @@ func TestE2E_ApexBridge_InvalidScenarios(t *testing.T) {
 				apex.Config.PrimeConfig.NetworkType, bridgingRequestMetadata)
 			require.NoError(t, err)
 
-			apiURL, err := apex.GetBridgingAPI()
-			require.NoError(t, err)
-			cardanofw.WaitForInvalidState(t, ctx, apiURL, apiKey, cardanofw.ChainIDPrime, txHash)
+			cardanofw.WaitForInvalidState(t, ctx, apex, cardanofw.ChainIDPrime, txHash, apiKey)
 		}
 	})
 
@@ -476,9 +467,7 @@ func TestE2E_ApexBridge_InvalidScenarios(t *testing.T) {
 		wg.Wait()
 
 		for i := 0; i < instances; i++ {
-			apiURL, err := apex.GetBridgingAPI()
-			require.NoError(t, err)
-			cardanofw.WaitForInvalidState(t, ctx, apiURL, apiKey, cardanofw.ChainIDPrime, txHashes[i])
+			cardanofw.WaitForInvalidState(t, ctx, apex, cardanofw.ChainIDPrime, txHashes[i], apiKey)
 		}
 	})
 
@@ -538,13 +527,7 @@ func TestE2E_ApexBridge_InvalidScenarios(t *testing.T) {
 			apex.Config.PrimeConfig.NetworkType, bridgingRequestMetadata)
 		require.NoError(t, err)
 
-		apiURL, err := apex.GetBridgingAPI()
-		require.NoError(t, err)
-
-		requestURL := fmt.Sprintf(
-			"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, cardanofw.ChainIDPrime, txHash)
-
-		_, err = cardanofw.WaitForRequestStates(ctx, requestURL, apiKey, nil, 60)
+		_, err = cardanofw.WaitForRequestStates(ctx, apex, cardanofw.ChainIDPrime, txHash, apiKey, nil, 60)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "timeout")
 	})
@@ -583,9 +566,7 @@ func TestE2E_ApexBridge_InvalidScenarios(t *testing.T) {
 			apex.Config.PrimeConfig.NetworkType, bridgingRequestMetadata)
 		require.NoError(t, err)
 
-		apiURL, err := apex.GetBridgingAPI()
-		require.NoError(t, err)
-		cardanofw.WaitForInvalidState(t, ctx, apiURL, apiKey, cardanofw.ChainIDPrime, txHash)
+		cardanofw.WaitForInvalidState(t, ctx, apex, cardanofw.ChainIDPrime, txHash, apiKey)
 	})
 
 	t.Run("Submitted invalid metadata - invalid sender", func(t *testing.T) {
@@ -622,9 +603,7 @@ func TestE2E_ApexBridge_InvalidScenarios(t *testing.T) {
 			apex.Config.PrimeConfig.NetworkType, bridgingRequestMetadata)
 		require.NoError(t, err)
 
-		apiURL, err := apex.GetBridgingAPI()
-		require.NoError(t, err)
-		cardanofw.WaitForInvalidState(t, ctx, apiURL, apiKey, cardanofw.ChainIDPrime, txHash)
+		cardanofw.WaitForInvalidState(t, ctx, apex, cardanofw.ChainIDPrime, txHash, apiKey)
 	})
 
 	t.Run("Submitted invalid metadata - empty tx", func(t *testing.T) {
@@ -650,9 +629,7 @@ func TestE2E_ApexBridge_InvalidScenarios(t *testing.T) {
 			apex.Config.PrimeConfig.NetworkType, bridgingRequestMetadata)
 		require.NoError(t, err)
 
-		apiURL, err := apex.GetBridgingAPI()
-		require.NoError(t, err)
-		cardanofw.WaitForInvalidState(t, ctx, apiURL, apiKey, cardanofw.ChainIDPrime, txHash)
+		cardanofw.WaitForInvalidState(t, ctx, apex, cardanofw.ChainIDPrime, txHash, apiKey)
 	})
 }
 

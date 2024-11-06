@@ -342,9 +342,19 @@ func ShouldSkipE2RRedundantTests() bool {
 }
 
 func WaitForBatchStateGeneric(
-	ctx context.Context, requestURL string, apiKey string, timeout time.Duration, handler func(status string) bool,
+	ctx context.Context, apex *ApexSystem, chainID string, txHash string,
+	apiKey string, timeout time.Duration, handler func(status string) bool,
 ) error {
-	var currentStatus string
+	apiURL, err := apex.GetBridgingAPI()
+	if err != nil {
+		return err
+	}
+
+	var (
+		requestURL = fmt.Sprintf(
+			"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, chainID, txHash)
+		currentStatus string
+	)
 
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()
@@ -377,10 +387,11 @@ func WaitForBatchStateGeneric(
 }
 
 func WaitForBatchState(
-	ctx context.Context, requestURL string, apiKey string, breakIfFailed bool, failAtLeastOnce bool, batchState string,
+	ctx context.Context, apex *ApexSystem, chainID string, txHash string,
+	apiKey string, breakIfFailed bool, failAtLeastOnce bool, batchState string,
 ) (int, bool) {
 	failedToExecuteCount := 0
-	err := WaitForBatchStateGeneric(ctx, requestURL, apiKey, time.Second*300, func(status string) bool {
+	err := WaitForBatchStateGeneric(ctx, apex, chainID, txHash, apiKey, time.Second*300, func(status string) bool {
 		if status == BatchStateFailedToExecute {
 			failedToExecuteCount++
 
@@ -396,11 +407,12 @@ func WaitForBatchState(
 }
 
 func WaitForRequestStates(
-	ctx context.Context, requestURL string, apiKey string, expectedStates []string, timeoutSec uint,
+	ctx context.Context, apex *ApexSystem, chainID string, txHash string,
+	apiKey string, expectedStates []string, timeoutSec uint,
 ) (string, error) {
 	selectedState := ""
 	timeoutTime := time.Duration(timeoutSec) * time.Second
-	err := WaitForBatchStateGeneric(ctx, requestURL, apiKey, timeoutTime, func(status string) bool {
+	err := WaitForBatchStateGeneric(ctx, apex, chainID, txHash, apiKey, timeoutTime, func(status string) bool {
 		if len(expectedStates) == 0 {
 			selectedState = status
 
@@ -422,14 +434,11 @@ func WaitForRequestStates(
 }
 
 func WaitForInvalidState(
-	t *testing.T, ctx context.Context, apiURL string, apiKey string, chainID string, txHash string) {
+	t *testing.T, ctx context.Context, apex *ApexSystem, chainID string, txHash string, apiKey string) {
 	t.Helper()
 
-	requestURL := fmt.Sprintf(
-		"%s/api/BridgingRequestState/Get?chainId=%s&txHash=%s", apiURL, chainID, txHash)
-
 	state, err := WaitForRequestStates(
-		ctx, requestURL, apiKey, []string{BridgingRequestStatusInvalidRequest}, 300)
+		ctx, apex, chainID, txHash, apiKey, []string{BridgingRequestStatusInvalidRequest}, 300)
 	require.NoError(t, err)
 	require.Equal(t, BridgingRequestStatusInvalidRequest, state)
 }
