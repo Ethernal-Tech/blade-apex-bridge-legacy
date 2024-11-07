@@ -12,13 +12,14 @@ import (
 const TestCatsServerAPIKey = "zum-zum-eprom"
 
 type TestCatsServerConfig struct {
-	ID          int
-	ConfigPath  string
-	LogsPath    string
-	NetworkType wallet.CardanoNetworkType
-	Port        int
-	SocketPath  string
-	StdOut      io.Writer
+	ID                   int
+	ConfigPath           string
+	LogsPath             string
+	NetworkType          wallet.CardanoNetworkType
+	Port                 int
+	SocketPath           string
+	StdOut               io.Writer
+	MaxParallelTxSubmits int
 }
 
 type TestCatsServer struct {
@@ -61,6 +62,11 @@ func (t *TestCatsServer) Start() error {
 		"--output-dir", t.config.ConfigPath,
 		"--logs-path", t.config.LogsPath,
 	}
+
+	if t.config.MaxParallelTxSubmits != 0 {
+		args = append(args, "max-parallel-tx-submits", fmt.Sprint(t.config.MaxParallelTxSubmits))
+	}
+
 	argsRun := []string{"run", "--config", filepath.Join(t.config.ConfigPath, "config.json")}
 	binary := ResolvEthernalCatsBinary(t.config.NetworkType)
 

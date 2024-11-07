@@ -95,6 +95,121 @@ func Test_OnlyRunApexBridge_WithNexusAndVector(t *testing.T) {
 	<-signalChannel
 }
 
+func Test_OnlyRunApexBridge_WithNexusAndVector_BenchmarkCATS(t *testing.T) {
+	// t.Skip()
+
+	const (
+		apiKey = "test_api_key"
+	)
+
+	ctx, cncl := context.WithCancel(context.Background())
+	defer cncl()
+
+	apex := cardanofw.SetupAndRunApexBridge(
+		t, ctx,
+		cardanofw.WithAPIKey(apiKey),
+		cardanofw.WithVectorEnabled(true),
+		cardanofw.WithNexusEnabled(true),
+		cardanofw.WithUserCnt(2),
+	)
+
+	defer require.True(t, apex.ApexBridgeProcessesRunning())
+
+	oracleAPI, err := apex.GetBridgingAPI()
+	require.NoError(t, err)
+
+	fmt.Printf("oracle API: %s\n", oracleAPI)
+	fmt.Printf("oracle API key: %s\n", apiKey)
+
+	fmt.Printf("prime network url: %s\n", apex.PrimeInfo.NetworkAddress)
+	fmt.Printf("prime ogmios url: %s\n", apex.PrimeInfo.OgmiosURL)
+	fmt.Printf("prime bridging addr: %s\n", apex.PrimeInfo.MultisigAddr)
+	fmt.Printf("prime fee addr: %s\n", apex.PrimeInfo.FeeAddr)
+	fmt.Printf("prime socket path: %s\n", apex.PrimeInfo.SocketPath)
+
+	fmt.Printf("vector network url: %s\n", apex.VectorInfo.NetworkAddress)
+	fmt.Printf("vector ogmios url: %s\n", apex.VectorInfo.OgmiosURL)
+	fmt.Printf("vector bridging addr: %s\n", apex.VectorInfo.MultisigAddr)
+	fmt.Printf("vector fee addr: %s\n", apex.VectorInfo.FeeAddr)
+	fmt.Printf("vector socket path: %s\n", apex.VectorInfo.SocketPath)
+
+	user := apex.Users[0]
+	userPrimeSK, err := user.GetPrivateKey(cardanofw.ChainIDPrime)
+	require.NoError(t, err)
+	userVectorSK, err := user.GetPrivateKey(cardanofw.ChainIDVector)
+	require.NoError(t, err)
+	userNexusPK, err := user.GetPrivateKey(cardanofw.ChainIDNexus)
+	require.NoError(t, err)
+
+	fmt.Printf("user prime addr: %s\n", user.GetAddress(cardanofw.ChainIDPrime))
+	fmt.Printf("user prime signing key hex: %s\n", userPrimeSK)
+	fmt.Printf("user vector addr: %s\n", user.GetAddress(cardanofw.ChainIDVector))
+	fmt.Printf("user vector signing key hex: %s\n", userVectorSK)
+
+	chainID, err := apex.NexusInfo.Node.JSONRPC().ChainID()
+	require.NoError(t, err)
+
+	fmt.Printf("nexus user addr: %s\n", user.GetAddress(cardanofw.ChainIDNexus))
+	fmt.Printf("nexus user signing key: %s\n", userNexusPK)
+	fmt.Printf("nexus url: %s\n", apex.NexusInfo.Node.JSONRPCAddr())
+	fmt.Printf("nexus gateway sc addr: %s\n", apex.NexusInfo.GatewayAddress)
+	fmt.Printf("nexus chainID: %v\n", chainID)
+
+	fmt.Printf("bridge url: %s\n", apex.GetBridgeDefaultJSONRPCAddr())
+
+	// signalChannel := make(chan os.Signal, 1)
+	// // Notify the signalChannel when the interrupt signal is received (Ctrl+C)
+	// signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
+
+	// <-signalChannel
+
+	type TestCase struct {
+		ID                       int
+		MaxParallelTxSubmitsCATS int
+	}
+
+	testCases := []*TestCase{
+		{
+			ID:                       1,
+			MaxParallelTxSubmitsCATS: 2,
+		},
+		{
+			ID:                       2,
+			MaxParallelTxSubmitsCATS: 5,
+		},
+		{
+			ID:                       3,
+			MaxParallelTxSubmitsCATS: 10,
+		},
+		{
+			ID:                       4,
+			MaxParallelTxSubmitsCATS: 20,
+		},
+	}
+
+	printResult := func(results chan Result) {
+		for result := range results {
+			fmt.Printf("Endpoint: %s | Success: %d | Failure: %d | Time: %v\n",
+				result.Endpoint, result.Success, result.Failure, result.Time)
+		}
+	}
+
+	requestCount := 1000
+
+	printResult(RunBenchmarks(apex.Users, apex.PrimeInfo, requestCount))
+
+	primeCluster := apex.GetChainMust(t, cardanofw.ChainIDPrime).(*cardanofw.TestCardanoChain).GetCluster()
+
+	for _, tc := range testCases {
+		require.NoError(t, primeCluster.CatsServer.Stop())
+		primeCluster.Config.MaxParallelTxSubmitsCATS = tc.MaxParallelTxSubmitsCATS
+		require.NoError(t, primeCluster.StartCats(primeCluster.Config.ID, primeCluster.Config.Dir("CATS")))
+
+		time.Sleep(time.Second * 1)
+		printResult(RunBenchmarks(apex.Users, apex.PrimeInfo, requestCount))
+	}
+}
+
 func TestE2E_ApexBridge_CardanoOracleState(t *testing.T) {
 	if cardanofw.ShouldSkipE2RRedundantTests() {
 		t.Skip()

@@ -103,7 +103,7 @@ func (ec *TestCardanoChain) RunChain(t *testing.T) error {
 		WithNodesCount(ec.config.NodesCount),
 		WithStartTimeDelay(time.Second*5),
 		WithPort(5100+ec.config.ID*100),
-		WithOgmiosPort(1337+ec.config.ID),
+		WithOgmiosPort(10000+ec.config.ID),
 		WithNetworkType(ec.config.NetworkType),
 		WithConfigGenesisDir(networkName),
 		WithInitialFunds(ec.config.PreminesAddresses, ec.config.PremineAmount),
@@ -208,7 +208,7 @@ func (ec *TestCardanoChain) FundWallets(ctx context.Context) error {
 	fmt.Printf("%s fee addr funded: %s\n", GetNetworkName(ec.config.NetworkType), txHash)
 
 	// retrieve latest tip
-	tip, err := cardWallet.NewTxProviderOgmios(ec.cluster.CatsURL()).GetTip(ctx)
+	tip, err := cardWallet.NewTxProviderCats(ec.cluster.CatsURL(), TestCatsServerAPIKey, "").GetTip(ctx)
 	if err != nil {
 		return err
 	}
@@ -272,6 +272,10 @@ func (ec *TestCardanoChain) PopulateApexSystem(apexSystem *ApexSystem) {
 
 func (ec *TestCardanoChain) ChainID() string {
 	return GetNetworkName(ec.config.NetworkType)
+}
+
+func (ec *TestCardanoChain) GetCluster() *TestCardanoCluster {
+	return ec.cluster
 }
 
 func (ec *TestCardanoChain) GetAddressBalance(ctx context.Context, addr string) (*big.Int, error) {

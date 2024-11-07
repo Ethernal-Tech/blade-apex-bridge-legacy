@@ -25,17 +25,18 @@ var cardanoFiles embed.FS
 const hostIP = "127.0.0.1"
 
 type TestCardanoClusterConfig struct {
-	ID             int
-	NetworkType    wallet.CardanoNetworkType
-	SecurityParam  int
-	NodesCount     int
-	StartNodeID    int
-	Port           int
-	OgmiosPort     int
-	InitialSupply  *big.Int
-	BlockTimeMilis int
-	GenesisDir     string
-	StartTimeDelay time.Duration
+	ID                       int
+	NetworkType              wallet.CardanoNetworkType
+	SecurityParam            int
+	NodesCount               int
+	StartNodeID              int
+	Port                     int
+	OgmiosPort               int
+	MaxParallelTxSubmitsCATS int
+	InitialSupply            *big.Int
+	BlockTimeMilis           int
+	GenesisDir               string
+	StartTimeDelay           time.Duration
 
 	TmpDir string
 
@@ -406,13 +407,14 @@ func (c *TestCardanoCluster) WaitForBlockWithState(
 
 func (c *TestCardanoCluster) StartCats(id int, logsFilePath string) error {
 	srv, err := NewTestCatsServer(&TestCatsServerConfig{
-		ID:          id,
-		NetworkType: c.Config.NetworkType,
-		Port:        c.Config.OgmiosPort,
-		SocketPath:  c.Servers[0].SocketPath(),
-		LogsPath:    logsFilePath,
-		ConfigPath:  c.Config.Dir(""),
-		StdOut:      os.Stdout,
+		ID:                   id,
+		NetworkType:          c.Config.NetworkType,
+		Port:                 c.Config.OgmiosPort,
+		SocketPath:           c.Servers[0].SocketPath(),
+		LogsPath:             logsFilePath,
+		ConfigPath:           c.Config.Dir(""),
+		StdOut:               os.Stdout,
+		MaxParallelTxSubmits: c.Config.MaxParallelTxSubmitsCATS,
 	})
 	if err != nil {
 		return err
