@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	maxNumberOfTransactions = 5
+	maxNumberOfTransactions = 10
 	timeoutBlocksNumber     = 5
 )
 
