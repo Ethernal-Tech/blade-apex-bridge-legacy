@@ -128,7 +128,7 @@ jobs:
       github.event_name == 'pull_request'
     with:
       e2e_apex_big_test: ${{ inputs.e2e_apex_big_test || 'false' }}
-      e2e_apex_skip_redundant_tests: ${{ inputs.e2e_apex_skip_redundant_tests || 'true' }}
+      e2e_apex_skip_redundant_tests: ${{ inputs.e2e_apex_skip_redundant_tests || 'false' }}
     secrets:
       PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   e2e_apex_test_push:
