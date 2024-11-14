@@ -11,11 +11,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	infracommon "github.com/Ethernal-Tech/cardano-infrastructure/common"
 	infrawallet "github.com/Ethernal-Tech/cardano-infrastructure/wallet"
 )
@@ -95,7 +95,7 @@ func NewTestCardanoChain(config *TestCardanoChainConfig) ITestApexChain {
 	}
 }
 
-func (ec *TestCardanoChain) RunChain(t *testing.T) error {
+func (ec *TestCardanoChain) RunChain(t framework.TestingT) error {
 	t.Helper()
 
 	networkName := GetNetworkName(ec.config.NetworkType)

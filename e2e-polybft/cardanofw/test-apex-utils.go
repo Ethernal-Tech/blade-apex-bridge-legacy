@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/Ethernal-Tech/cardano-infrastructure/wallet"
 	"github.com/stretchr/testify/require"
 )
@@ -300,20 +301,20 @@ func tryResolveFromEnv(env, name string) string {
 	return name
 }
 
-func GetLogsFile(t *testing.T, filePath string, withStdout bool) io.Writer {
+func GetLogsFile(t framework.TestingT, filePath string, withStdout bool) io.Writer {
 	t.Helper()
 
 	var writers []io.Writer
 
 	f, err := os.OpenFile(filePath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0600)
 	if err != nil {
-		t.Log("failed to create log file", "err", err, "file", filePath)
+		t.Logf("failed to create log file %s: %s", filePath, err)
 	} else {
 		writers = append(writers, f)
 
 		t.Cleanup(func() {
 			if err := f.Close(); err != nil {
-				t.Log("GetStdout close file error", "err", err)
+				t.Logf("GetStdout close file error: %s", err)
 			}
 		})
 	}

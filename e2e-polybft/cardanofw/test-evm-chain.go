@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/genesis"
@@ -98,7 +97,7 @@ func NewTestEVMChain(config *TestEVMChainConfig) (ITestApexChain, error) {
 	}, nil
 }
 
-func (ec *TestEVMChain) RunChain(t *testing.T) error {
+func (ec *TestEVMChain) RunChain(t framework.TestingT) error {
 	t.Helper()
 
 	cluster := framework.NewTestCluster(t, ec.config.ValidatorCount,

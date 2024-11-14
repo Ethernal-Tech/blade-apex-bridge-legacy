@@ -24,11 +24,11 @@ func SendTx(ctx context.Context,
 	metadata []byte,
 ) (txHash string, err error) {
 	return infracommon.ExecuteWithRetry(ctx, func(ctx context.Context) (string, error) {
-		return sendTx(ctx, txProvider, cardanoWallet, amount, receiver, networkType, metadata)
+		return SendCardanoTransaction(ctx, txProvider, cardanoWallet, amount, receiver, networkType, metadata)
 	})
 }
 
-func sendTx(ctx context.Context,
+func SendCardanoTransaction(ctx context.Context,
 	txProvider wallet.ITxProvider,
 	cardanoWallet wallet.IWallet,
 	amount uint64,

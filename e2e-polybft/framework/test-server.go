@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"testing"
 	"time"
 
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
@@ -56,7 +55,7 @@ func getOpenPortForServer() int64 {
 }
 
 type TestServer struct {
-	t *testing.T
+	t TestingT
 
 	address       types.Address
 	clusterConfig *TestClusterConfig
@@ -82,18 +81,14 @@ func (t *TestServer) BridgeJSONRPCAddr() string {
 
 func (t *TestServer) JSONRPC() *jsonrpc.EthClient {
 	clt, err := jsonrpc.NewEthClient(t.JSONRPCAddr())
-	if err != nil {
-		t.t.Fatal(err)
-	}
+	require.NoError(t.t, err)
 
 	return clt
 }
 
 func (t *TestServer) Conn() proto.SystemClient {
 	conn, err := grpc.Dial(t.GrpcAddr(), grpc.WithInsecure())
-	if err != nil {
-		t.t.Fatal(err)
-	}
+	require.NoError(t.t, err)
 
 	return proto.NewSystemClient(conn)
 }
@@ -104,14 +99,12 @@ func (t *TestServer) DataDir() string {
 
 func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 	conn, err := grpc.Dial(t.GrpcAddr(), grpc.WithInsecure())
-	if err != nil {
-		t.t.Fatal(err)
-	}
+	require.NoError(t.t, err)
 
 	return txpoolProto.NewTxnPoolOperatorClient(conn)
 }
 
-func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
+func NewTestServer(t TestingT, clusterConfig *TestClusterConfig,
 	bridgeJSONRPC string, callback TestServerConfigCallback) *TestServer {
 	t.Helper()
 
@@ -201,9 +194,7 @@ func (t *TestServer) Start() {
 	stdout := t.clusterConfig.GetStdout(t.config.Name)
 
 	node, err := NewNode(t.clusterConfig.Binary, args, stdout)
-	if err != nil {
-		t.t.Fatal(err)
-	}
+	require.NoError(t.t, err)
 
 	t.node = node
 
@@ -213,9 +204,7 @@ func (t *TestServer) Start() {
 
 func (t *TestServer) Stop() {
 	if err := t.node.Stop(); err != nil {
-		if !errors.Is(err, os.ErrProcessDone) {
-			t.t.Fatal(err)
-		}
+		require.NotErrorIs(t.t, err, os.ErrProcessDone)
 	}
 
 	t.node = nil

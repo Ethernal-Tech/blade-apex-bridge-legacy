@@ -90,7 +90,7 @@ func resolveBinary() string {
 }
 
 type TestClusterConfig struct {
-	t *testing.T
+	t TestingT
 
 	Name                 string
 	Premine              []string // address[:amount]
@@ -169,9 +169,7 @@ func (c *TestClusterConfig) GetStdout(name string, custom ...io.Writer) io.Write
 		})
 
 		f, err := os.OpenFile(filepath.Join(c.LogsDir, name+".log"), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0600)
-		if err != nil {
-			c.t.Fatal(err)
-		}
+		require.NoError(c.t, err)
 
 		writers = append(writers, f)
 
@@ -207,9 +205,7 @@ func (c *TestClusterConfig) initLogsDir() {
 		logsDir = path.Join(logsDir, fmt.Sprintf("%v-%d", c.t.Name(), time.Now().UTC().Unix()))
 	}
 
-	if err := common.CreateDirSafe(logsDir, 0750); err != nil {
-		c.t.Fatal(err)
-	}
+	require.NoError(c.t, common.CreateDirSafe(logsDir, 0750))
 
 	c.t.Logf("logs enabled for e2e test: %s", logsDir)
 	c.LogsDir = logsDir
@@ -512,9 +508,7 @@ func NewPropertyTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOp
 	return NewTestCluster(t, validatorsCount, opts...)
 }
 
-func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
-	t.Helper()
-
+func NewTestCluster(t TestingT, validatorsCount int, opts ...ClusterOption) *TestCluster {
 	var err error
 
 	config := &TestClusterConfig{
@@ -825,7 +819,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	return cluster
 }
 
-func (c *TestCluster) InitTestServer(t *testing.T,
+func (c *TestCluster) InitTestServer(t TestingT,
 	dataDir string, bridgeJSONRPC string, nodeType NodeType) {
 	t.Helper()
 
@@ -834,9 +828,7 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 	dataDir = c.Config.Dir(dataDir)
 	if c.Config.InitialTrieDB != "" {
 		err := CopyDir(c.Config.InitialTrieDB, filepath.Join(dataDir, "trie"))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(c.Config.t, err)
 	}
 
 	srv := NewTestServer(t, c.Config, bridgeJSONRPC, func(config *TestServerConfig) {

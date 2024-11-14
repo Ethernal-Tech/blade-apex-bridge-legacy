@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"path"
 	"strconv"
-	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -20,16 +19,17 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
 
 type TestBridge struct {
-	t             *testing.T
+	t             TestingT
 	clusterConfig *TestClusterConfig
 	node          *Node
 }
 
-func NewTestBridge(t *testing.T, clusterConfig *TestClusterConfig) (*TestBridge, error) {
+func NewTestBridge(t TestingT, clusterConfig *TestClusterConfig) (*TestBridge, error) {
 	t.Helper()
 
 	bridge := &TestBridge{
@@ -70,9 +70,7 @@ func (t *TestBridge) Start() error {
 }
 
 func (t *TestBridge) Stop() {
-	if err := t.node.Stop(); err != nil {
-		t.t.Error(err)
-	}
+	require.NoError(t.t, t.node.Stop())
 
 	t.node = nil
 }

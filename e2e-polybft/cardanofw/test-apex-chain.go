@@ -3,13 +3,13 @@ package cardanofw
 import (
 	"context"
 	"math/big"
-	"testing"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 )
 
 type ITestApexChain interface {
-	RunChain(t *testing.T) error
+	RunChain(t framework.TestingT) error
 	Stop() error
 	CreateWallets(validator *TestApexValidator) error
 	CreateAddresses(bladeAdmin *crypto.ECDSAKey, bridgeURL string) error
@@ -81,7 +81,7 @@ func (t *TestApexChainDummy) RegisterChain(validator *TestApexValidator) error {
 	return nil
 }
 
-func (*TestApexChainDummy) RunChain(t *testing.T) error {
+func (*TestApexChainDummy) RunChain(t framework.TestingT) error {
 	t.Helper()
 
 	return nil
