@@ -358,8 +358,7 @@ func (ec *TestCardanoChain) SendTx(
 		}
 
 		return txHash, nil
-	}, infracommon.WithIsRetryableError(IsRecoverableError),
-		infracommon.WithRetryCount(retryCount), infracommon.WithRetryWaitTime(retryWaitTime))
+	}, infracommon.WithRetryCount(retryCount), infracommon.WithRetryWaitTime(retryWaitTime))
 }
 
 func (ec *TestCardanoChain) GetHotWalletAddress() string {

@@ -441,10 +441,7 @@ func (a *ApexSystem) WaitForAmount(
 		}
 
 		return newBalance, nil
-	},
-		infracommon.WithIsRetryableError(IsRecoverableError),
-		infracommon.WithRetryCount(numRetries),
-		infracommon.WithRetryWaitTime(waitTime))
+	}, infracommon.WithRetryCount(numRetries), infracommon.WithRetryWaitTime(waitTime))
 }
 
 func (a *ApexSystem) SubmitTx(
