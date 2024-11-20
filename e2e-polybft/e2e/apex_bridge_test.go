@@ -1506,6 +1506,7 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 		var (
 			wg           sync.WaitGroup
 			errsPerChain = make(map[chainStageKey]error, len(chainPrevAmounts))
+			mu           sync.Mutex
 		)
 
 		for chainKey, prevAmount := range chainPrevAmounts {
@@ -1519,6 +1520,9 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 
 				expectedAmount := cardanofw.ToChainNativeTokenAmount(chainKey.chain, expected)
 				expectedAmount.Add(expectedAmount, prevAmount)
+
+				mu.Lock()
+				defer mu.Unlock()
 
 				errsPerChain[chainKey] = apex.WaitForExactAmount(
 					ctx, chainReceivers[chainKey], chainKey.chain, expectedAmount, numRetries, waitTime)
@@ -1690,6 +1694,7 @@ func TestE2E_ApexBridge_Defund(t *testing.T) {
 		var (
 			wg           sync.WaitGroup
 			errsPerChain = make(map[string]error, len(chainPrevAmounts))
+			mu           sync.Mutex
 		)
 
 		for chain, prevAmount := range chainPrevAmounts {
@@ -1705,6 +1710,9 @@ func TestE2E_ApexBridge_Defund(t *testing.T) {
 				expectedAmount.Mul(expectedAmount,
 					cardanofw.ToChainNativeTokenAmount(chain, apexSendAmount))
 				expectedAmount.Add(expectedAmount, prevAmount)
+
+				mu.Lock()
+				defer mu.Unlock()
 
 				errsPerChain[chain] = apex.WaitForExactAmount(
 					ctx, receiver, chain, expectedAmount, numRetries, waitTime)
