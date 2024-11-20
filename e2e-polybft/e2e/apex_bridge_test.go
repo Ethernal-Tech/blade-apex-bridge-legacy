@@ -1436,9 +1436,9 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 		wg  sync.WaitGroup
 	)
 
-	type chainUserKey struct {
+	type chainStageKey struct {
 		chain string
-		user  uint64
+		stage uint
 	}
 
 	type bridingRequest struct {
@@ -1446,22 +1446,23 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 		dest   string
 		sender *cardanofw.TestApexUser
 		amount *big.Int
+		stage  uint
 	}
 
 	bridgeTransactions := func(ctx context.Context, apex *cardanofw.ApexSystem,
-		bridgingRequests []*bridingRequest, receivers map[uint64]*cardanofw.TestApexUser) (
-		map[chainUserKey]*big.Int, map[chainUserKey]*big.Int, map[chainUserKey]*cardanofw.TestApexUser,
+		bridgingRequests []*bridingRequest, receivers map[uint]*cardanofw.TestApexUser) (
+		map[chainStageKey]*big.Int, map[chainStageKey]*big.Int, map[chainStageKey]*cardanofw.TestApexUser,
 	) {
 		var (
-			chainPrevAmounts     = make(map[chainUserKey]*big.Int)
-			chainExpectedAmounts = make(map[chainUserKey]*big.Int)
-			chainReceivers       = make(map[chainUserKey]*cardanofw.TestApexUser)
+			chainPrevAmounts     = make(map[chainStageKey]*big.Int)
+			chainExpectedAmounts = make(map[chainStageKey]*big.Int)
+			chainReceivers       = make(map[chainStageKey]*cardanofw.TestApexUser)
 		)
 
 		for _, br := range bridgingRequests {
-			key := chainUserKey{chain: br.dest, user: br.amount.Uint64()}
+			key := chainStageKey{chain: br.dest, stage: br.stage}
 			if _, exists := chainPrevAmounts[key]; !exists {
-				prevAmount, err := apex.GetBalance(ctx, receivers[br.amount.Uint64()], br.dest)
+				prevAmount, err := apex.GetBalance(ctx, receivers[br.stage], br.dest)
 				require.NoError(t, err)
 
 				chainPrevAmounts[key] = prevAmount
@@ -1474,7 +1475,7 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 			chainExpectedAmounts[key].Add(chainExpectedAmounts[key], br.amount)
 
 			if _, exists := chainReceivers[key]; !exists {
-				chainReceivers[key] = receivers[br.amount.Uint64()]
+				chainReceivers[key] = receivers[br.stage]
 			}
 		}
 
@@ -1487,7 +1488,7 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 				defer wg.Done()
 
 				txHash := apex.SubmitBridgingRequest(t, ctx, src, dest, sender,
-					cardanofw.ToChainNativeTokenAmount(src, br.amount), receivers[br.amount.Uint64()])
+					cardanofw.ToChainNativeTokenAmount(src, br.amount), receivers[br.stage])
 				fmt.Printf("Bridging request: %v to %v sent. hash: %s\n", src, dest, txHash)
 			}(br.src, br.dest, br.sender)
 		}
@@ -1499,12 +1500,12 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 
 	waitOnDestination := func(
 		ctx context.Context, apex *cardanofw.ApexSystem,
-		chainPrevAmounts map[chainUserKey]*big.Int, chainExpectedAmounts map[chainUserKey]*big.Int,
-		chainReceivers map[chainUserKey]*cardanofw.TestApexUser, numRetries int, waitTime time.Duration,
-	) map[chainUserKey]error {
+		chainPrevAmounts map[chainStageKey]*big.Int, chainExpectedAmounts map[chainStageKey]*big.Int,
+		chainReceivers map[chainStageKey]*cardanofw.TestApexUser, numRetries int, waitTime time.Duration,
+	) map[chainStageKey]error {
 		var (
 			wg           sync.WaitGroup
-			errsPerChain = make(map[chainUserKey]error, len(chainPrevAmounts))
+			errsPerChain = make(map[chainStageKey]error, len(chainPrevAmounts))
 		)
 
 		for chainKey, prevAmount := range chainPrevAmounts {
@@ -1572,14 +1573,14 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 
 		var (
 			bridgingRequests = []*bridingRequest{
-				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDVector, sender: apex.Users[0], amount: big.NewInt(1)},
-				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDNexus, sender: apex.Users[1], amount: big.NewInt(1)},
-				{src: cardanofw.ChainIDVector, dest: cardanofw.ChainIDPrime, sender: apex.Users[0], amount: big.NewInt(1)},
-				{src: cardanofw.ChainIDNexus, dest: cardanofw.ChainIDPrime, sender: apex.Users[0], amount: big.NewInt(1)},
+				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDVector, sender: apex.Users[0], amount: big.NewInt(1), stage: 0},
+				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDNexus, sender: apex.Users[1], amount: big.NewInt(1), stage: 0},
+				{src: cardanofw.ChainIDVector, dest: cardanofw.ChainIDPrime, sender: apex.Users[0], amount: big.NewInt(1), stage: 0},
+				{src: cardanofw.ChainIDNexus, dest: cardanofw.ChainIDPrime, sender: apex.Users[0], amount: big.NewInt(1), stage: 0},
 			}
 
-			receivers = map[uint64]*cardanofw.TestApexUser{
-				1: apex.Users[userCnt-1],
+			receivers = map[uint]*cardanofw.TestApexUser{
+				0: apex.Users[userCnt-1],
 			}
 		)
 
@@ -1621,19 +1622,19 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 
 		var (
 			bridgingRequests = []*bridingRequest{
-				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDVector, sender: apex.Users[0], amount: big.NewInt(1)},
-				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDVector, sender: apex.Users[1], amount: big.NewInt(100)},
-				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDNexus, sender: apex.Users[2], amount: big.NewInt(1)},
-				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDNexus, sender: apex.Users[3], amount: big.NewInt(100)},
-				{src: cardanofw.ChainIDVector, dest: cardanofw.ChainIDPrime, sender: apex.Users[0], amount: big.NewInt(1)},
-				{src: cardanofw.ChainIDVector, dest: cardanofw.ChainIDPrime, sender: apex.Users[1], amount: big.NewInt(100)},
-				{src: cardanofw.ChainIDNexus, dest: cardanofw.ChainIDPrime, sender: apex.Users[0], amount: big.NewInt(1)},
-				{src: cardanofw.ChainIDNexus, dest: cardanofw.ChainIDPrime, sender: apex.Users[1], amount: big.NewInt(100)},
+				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDVector, sender: apex.Users[0], amount: big.NewInt(1), stage: 0},
+				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDVector, sender: apex.Users[1], amount: big.NewInt(100), stage: 1},
+				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDNexus, sender: apex.Users[2], amount: big.NewInt(1), stage: 0},
+				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDNexus, sender: apex.Users[3], amount: big.NewInt(100), stage: 1},
+				{src: cardanofw.ChainIDVector, dest: cardanofw.ChainIDPrime, sender: apex.Users[0], amount: big.NewInt(1), stage: 0},
+				{src: cardanofw.ChainIDVector, dest: cardanofw.ChainIDPrime, sender: apex.Users[1], amount: big.NewInt(100), stage: 1},
+				{src: cardanofw.ChainIDNexus, dest: cardanofw.ChainIDPrime, sender: apex.Users[0], amount: big.NewInt(1), stage: 0},
+				{src: cardanofw.ChainIDNexus, dest: cardanofw.ChainIDPrime, sender: apex.Users[1], amount: big.NewInt(100), stage: 1},
 			}
 
-			receivers = map[uint64]*cardanofw.TestApexUser{
-				1:   apex.Users[userCnt-1],
-				100: apex.Users[userCnt-2],
+			receivers = map[uint]*cardanofw.TestApexUser{
+				0: apex.Users[userCnt-1],
+				1: apex.Users[userCnt-2],
 			}
 		)
 
@@ -1651,7 +1652,7 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 
 		errsPerChain = waitOnDestination(ctx, apex, chainPrevAmounts, chainExpectedAmounts, chainReceivers, 30, time.Second*10)
 		for chainKey, err := range errsPerChain {
-			if chainKey.user == 100 {
+			if chainKey.stage == 1 {
 				require.Error(t, err)
 				fmt.Printf("As intended, %v TXs on %v not yet arrived\n", chainExpectedAmounts[chainKey], chainKey)
 			} else {
