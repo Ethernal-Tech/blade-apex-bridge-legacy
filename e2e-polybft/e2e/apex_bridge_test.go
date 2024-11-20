@@ -1752,6 +1752,7 @@ func TestE2E_ApexBridge_Defund(t *testing.T) {
 			}{
 				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDVector, sender: apex.Users[0]},
 				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDNexus, sender: apex.Users[1]},
+				{src: cardanofw.ChainIDNexus, dest: cardanofw.ChainIDPrime, sender: apex.Users[0]},
 			}
 
 			chainPrevAmounts       = make(map[string]*big.Int)
@@ -1790,6 +1791,10 @@ func TestE2E_ApexBridge_Defund(t *testing.T) {
 		fmt.Printf("Defunding hot wallets\n")
 
 		err := apex.DefundHotWallet(
+			cardanofw.ChainIDPrime, defundReceiver.GetAddress(cardanofw.ChainIDPrime), apexDefundAndFundAmount)
+		require.NoError(t, err)
+
+		err = apex.DefundHotWallet(
 			cardanofw.ChainIDVector, defundReceiver.GetAddress(cardanofw.ChainIDVector), apexDefundAndFundAmount)
 		require.NoError(t, err)
 
@@ -1830,6 +1835,10 @@ func TestE2E_ApexBridge_Defund(t *testing.T) {
 		}
 
 		fmt.Printf("Funding hot wallets\n")
+
+		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDPrime,
+			cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDPrime, apexDefundAndFundAmount))
+		require.NoError(t, err)
 
 		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDVector,
 			cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDVector, apexDefundAndFundAmount))
