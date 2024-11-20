@@ -76,7 +76,7 @@ jobs:
         uses: actions/checkout@v4.1.1
         with:
           repository: Ethernal-Tech/apex-bridge
-          ref: main
+          ref: feat/defund
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
       - name: Build apex-bridge
         run: |
