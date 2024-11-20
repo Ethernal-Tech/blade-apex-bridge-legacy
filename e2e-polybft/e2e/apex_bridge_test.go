@@ -1521,11 +1521,13 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 				expectedAmount := cardanofw.ToChainNativeTokenAmount(chainKey.chain, expected)
 				expectedAmount.Add(expectedAmount, prevAmount)
 
+				err = apex.WaitForExactAmount(
+					ctx, chainReceivers[chainKey], chainKey.chain, expectedAmount, numRetries, waitTime)
+
 				mu.Lock()
 				defer mu.Unlock()
 
-				errsPerChain[chainKey] = apex.WaitForExactAmount(
-					ctx, chainReceivers[chainKey], chainKey.chain, expectedAmount, numRetries, waitTime)
+				errsPerChain[chainKey] = err
 			}()
 		}
 
@@ -1711,11 +1713,13 @@ func TestE2E_ApexBridge_Defund(t *testing.T) {
 					cardanofw.ToChainNativeTokenAmount(chain, apexSendAmount))
 				expectedAmount.Add(expectedAmount, prevAmount)
 
+				err := apex.WaitForExactAmount(
+					ctx, receiver, chain, expectedAmount, numRetries, waitTime)
+
 				mu.Lock()
 				defer mu.Unlock()
 
-				errsPerChain[chain] = apex.WaitForExactAmount(
-					ctx, receiver, chain, expectedAmount, numRetries, waitTime)
+				errsPerChain[chain] = err
 			}()
 		}
 
