@@ -207,7 +207,6 @@ func (ec *TestEVMChain) InitContracts(bridgeAdmin *crypto.ECDSAKey, bridgeURL st
 			"--bridge-url", bridgeURL,
 			"--bridge-addr", contracts.Bridge.String(),
 			"--bridge-key", hex.EncodeToString(bridgeAdminPk),
-			"--branch", "feat/nativeTokenPredicateChange",
 			"--dir", workingDirectory,
 			"--clone",
 		}
