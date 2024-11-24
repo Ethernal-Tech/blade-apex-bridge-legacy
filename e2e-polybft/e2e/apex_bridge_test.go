@@ -1707,17 +1707,20 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 	) error {
 		fmt.Printf("Funding hot wallets\n")
 
-		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDPrime, cardanofw.ApexToDfm(fundAmount))
+		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDPrime,
+			cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDPrime, fundAmount))
 		if err != nil {
 			return err
 		}
 
-		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDVector, cardanofw.ApexToDfm(fundAmount))
+		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDVector,
+			cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDVector, fundAmount))
 		if err != nil {
 			return err
 		}
 
-		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDNexus, cardanofw.ApexToWei(fundAmount))
+		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDNexus,
+			cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDNexus, fundAmount))
 		if err != nil {
 			return err
 		}
@@ -1847,44 +1850,62 @@ func TestE2E_ApexBridge_Defund(t *testing.T) {
 		t.Skip()
 	}
 
+	var (
+		err         error
+		initialFund = big.NewInt(100)
+	)
+
 	const (
 		apiKey       = "test_api_key"
 		userCnt      = 10
 		feeAmountDfm = 1_100_000
 	)
 
+	type chainStageKey struct {
+		chain string
+		stage uint
+	}
+
+	type bridingRequest struct {
+		src    string
+		dest   string
+		sender *cardanofw.TestApexUser
+		amount *big.Int
+		stage  uint
+	}
+
 	waitOnDestination := func(
-		ctx context.Context, apex *cardanofw.ApexSystem, receiver *cardanofw.TestApexUser,
-		apexSendAmount *big.Int, chainPrevAmounts map[string]*big.Int, chainExpectedInstances map[string]uint64,
+		ctx context.Context, apex *cardanofw.ApexSystem,
+		chainPrevAmounts map[chainStageKey]*big.Int,
+		chainExpectedAmounts map[chainStageKey]*big.Int,
+		chainReceivers map[chainStageKey]*cardanofw.TestApexUser,
 		numRetries int, waitTime time.Duration,
-	) map[string]error {
+	) map[chainStageKey]error {
 		var (
 			wg           sync.WaitGroup
-			errsPerChain = make(map[string]error, len(chainPrevAmounts))
+			errsPerChain = make(map[chainStageKey]error, len(chainPrevAmounts))
 			mu           sync.Mutex
 		)
 
-		for chain, prevAmount := range chainPrevAmounts {
+		for chainKey, prevAmount := range chainPrevAmounts {
 			wg.Add(1)
 
 			go func() {
 				defer wg.Done()
 
-				instances := chainExpectedInstances[chain]
-				fmt.Printf("Waiting for %v TXs on %v\n", instances, chain)
+				expected := chainExpectedAmounts[chainKey]
+				fmt.Printf("Waiting for %v Amount on %v\n", expected, chainKey.chain)
 
-				expectedAmount := new(big.Int).SetUint64(instances)
-				expectedAmount.Mul(expectedAmount,
-					cardanofw.ToChainNativeTokenAmount(chain, apexSendAmount))
+				expectedAmount := cardanofw.ToChainNativeTokenAmount(chainKey.chain, expected)
 				expectedAmount.Add(expectedAmount, prevAmount)
 
-				err := apex.WaitForExactAmount(
-					ctx, receiver, chain, expectedAmount, numRetries, waitTime)
+				err = apex.WaitForExactAmount(
+					ctx, chainReceivers[chainKey], chainKey.chain, expectedAmount, numRetries, waitTime)
 
 				mu.Lock()
 				defer mu.Unlock()
 
-				errsPerChain[chain] = err
+				errsPerChain[chainKey] = err
 			}()
 		}
 
@@ -1893,11 +1914,125 @@ func TestE2E_ApexBridge_Defund(t *testing.T) {
 		return errsPerChain
 	}
 
+	createBridgingData := func(ctx context.Context, apex *cardanofw.ApexSystem,
+		bridgingRequests []*bridingRequest, receivers map[uint]*cardanofw.TestApexUser,
+		defundReceiver *cardanofw.TestApexUser, defundAmount *big.Int) (
+		map[chainStageKey]*big.Int, map[chainStageKey]*big.Int,
+		map[chainStageKey]*cardanofw.TestApexUser,
+		map[chainStageKey]*big.Int, map[chainStageKey]*big.Int,
+		map[chainStageKey]*cardanofw.TestApexUser,
+	) {
+		var (
+			chainPrevAmounts     = make(map[chainStageKey]*big.Int)
+			chainExpectedAmounts = make(map[chainStageKey]*big.Int)
+			chainReceivers       = make(map[chainStageKey]*cardanofw.TestApexUser)
+
+			defundReceiversPrevAmount     = make(map[chainStageKey]*big.Int)
+			defundReceiversExpectedAmount = make(map[chainStageKey]*big.Int)
+			defundReceivers               = make(map[chainStageKey]*cardanofw.TestApexUser)
+		)
+
+		for _, br := range bridgingRequests {
+			key := chainStageKey{chain: br.dest, stage: br.stage}
+			if _, exists := chainPrevAmounts[key]; !exists {
+				prevAmount, err := apex.GetBalance(ctx, receivers[br.stage], br.dest)
+				require.NoError(t, err)
+
+				chainPrevAmounts[key] = prevAmount
+			}
+
+			if _, exists := chainExpectedAmounts[key]; !exists {
+				chainExpectedAmounts[key] = big.NewInt(0)
+			}
+
+			chainExpectedAmounts[key].Add(chainExpectedAmounts[key], br.amount)
+
+			if _, exists := chainReceivers[key]; !exists {
+				chainReceivers[key] = receivers[br.stage]
+			}
+
+			if _, exists := defundReceiversPrevAmount[key]; !exists {
+				prevAmount, err := apex.GetBalance(ctx, defundReceiver, br.dest)
+				require.NoError(t, err)
+
+				defundReceiversPrevAmount[key] = prevAmount
+			}
+
+			if _, exist := defundReceiversExpectedAmount[key]; !exist {
+				defundReceiversExpectedAmount[key] = big.NewInt(0)
+			}
+
+			defundReceiversExpectedAmount[key].Add(defundReceiversExpectedAmount[key], defundAmount)
+
+			if _, exists := defundReceivers[key]; !exists {
+				defundReceivers[key] = defundReceiver
+			}
+		}
+
+		return chainPrevAmounts, chainExpectedAmounts, chainReceivers, defundReceiversPrevAmount, defundReceiversExpectedAmount, defundReceivers
+	}
+
+	fundWallets := func(
+		ctx context.Context, apex *cardanofw.ApexSystem,
+		fundAmount *big.Int,
+	) error {
+		fmt.Printf("Funding hot wallets\n")
+
+		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDPrime,
+			cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDPrime, fundAmount))
+		if err != nil {
+			return err
+		}
+
+		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDVector,
+			cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDVector, fundAmount))
+		if err != nil {
+			return err
+		}
+
+		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDNexus,
+			cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDNexus, fundAmount))
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Hot wallets have been funded\n")
+
+		return nil
+	}
+
+	defundWallets := func(
+		ctx context.Context, apex *cardanofw.ApexSystem,
+		defundReceiver *cardanofw.TestApexUser, defundAmount *big.Int,
+		defundReceiverPrevAmounts map[chainStageKey]*big.Int, defundReceiversExpectedAmounts map[chainStageKey]*big.Int,
+		defundReceivers map[chainStageKey]*cardanofw.TestApexUser,
+	) error {
+		fmt.Printf("Defunding hot wallets\n")
+
+		err := apex.DefundHotWallet(
+			cardanofw.ChainIDPrime, defundReceiver.GetAddress(cardanofw.ChainIDPrime), defundAmount)
+		require.NoError(t, err)
+
+		err = apex.DefundHotWallet(
+			cardanofw.ChainIDVector, defundReceiver.GetAddress(cardanofw.ChainIDVector), defundAmount)
+		require.NoError(t, err)
+
+		err = apex.DefundHotWallet(
+			cardanofw.ChainIDNexus, defundReceiver.GetAddress(cardanofw.ChainIDNexus), defundAmount)
+		require.NoError(t, err)
+
+		errsPerChain := waitOnDestination(ctx, apex, defundReceiverPrevAmounts, defundReceiversExpectedAmounts, defundReceivers, 200, time.Second*10)
+		for chain, err := range errsPerChain {
+			require.NoError(t, err)
+			fmt.Printf("Defund on %v confirmed\n", chain)
+		}
+
+		return nil
+	}
+
 	t.Run("Basic defund test", func(t *testing.T) {
 		ctx, cncl := context.WithCancel(context.Background())
 		defer cncl()
-
-		initialFund := big.NewInt(100)
 
 		primeConfig, vectorConfig, nexusConfig := cardanofw.NewPrimeChainConfig(),
 			cardanofw.NewVectorChainConfig(true), cardanofw.NewNexusChainConfig(true)
@@ -1922,69 +2057,30 @@ func TestE2E_ApexBridge_Defund(t *testing.T) {
 			apexDefundAndFundAmount = big.NewInt(70)
 			apexSendAmount          = big.NewInt(50)
 
-			bridgingRequests = []struct {
-				src    string
-				dest   string
-				sender *cardanofw.TestApexUser
-			}{
-				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDVector, sender: apex.Users[0]},
-				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDNexus, sender: apex.Users[1]},
-				{src: cardanofw.ChainIDNexus, dest: cardanofw.ChainIDPrime, sender: apex.Users[0]},
+			bridgingRequests = []*bridingRequest{
+				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDVector, sender: apex.Users[0], amount: apexSendAmount, stage: 0},
+				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDNexus, sender: apex.Users[1], amount: apexSendAmount, stage: 0},
+				{src: cardanofw.ChainIDNexus, dest: cardanofw.ChainIDPrime, sender: apex.Users[0], amount: apexSendAmount, stage: 0},
 			}
 
-			chainPrevAmounts       = make(map[string]*big.Int)
-			chainExpectedInstances = make(map[string]uint64)
-
-			defundReceiverPrevAmounts = make(map[string]*big.Int)
-			defundExpectedInstances   = make(map[string]uint64)
+			receivers = map[uint]*cardanofw.TestApexUser{
+				0: apex.Users[userCnt-1],
+			}
 		)
 
 		require.True(t,
 			cardanofw.ApexToDfm(apexSendAmount).Uint64()+feeAmountDfm < cardanofw.ApexToDfm(initialFund).Uint64())
 
-		for _, br := range bridgingRequests {
-			if _, exists := chainPrevAmounts[br.dest]; !exists {
-				prevAmount, err := apex.GetBalance(ctx, receiver, br.dest)
-				require.NoError(t, err)
-
-				chainPrevAmounts[br.dest] = prevAmount
-			}
-
-			chainExpectedInstances[br.dest]++
-
-			if _, exists := defundReceiverPrevAmounts[br.dest]; !exists {
-				prevAmount, err := apex.GetBalance(ctx, defundReceiver, br.dest)
-				require.NoError(t, err)
-
-				defundReceiverPrevAmounts[br.dest] = prevAmount
-			}
-
-			defundExpectedInstances[br.dest] = 1
-		}
+		chainPrevAmounts, chainExpectedAmounts, chainReceivers,
+			defundReceiversPrevAmount, defundReceiversExpectedAmount, defundReceivers :=
+			createBridgingData(ctx, apex, bridgingRequests, receivers, defundReceiver, apexDefundAndFundAmount)
 
 		// give time for oracles to submit hot wallet increment claims for initial fundings
 		time.Sleep(time.Minute)
 
-		fmt.Printf("Defunding hot wallets\n")
-
-		err := apex.DefundHotWallet(
-			cardanofw.ChainIDPrime, defundReceiver.GetAddress(cardanofw.ChainIDPrime), apexDefundAndFundAmount)
-		require.NoError(t, err)
-
-		err = apex.DefundHotWallet(
-			cardanofw.ChainIDVector, defundReceiver.GetAddress(cardanofw.ChainIDVector), apexDefundAndFundAmount)
-		require.NoError(t, err)
-
-		err = apex.DefundHotWallet(
-			cardanofw.ChainIDNexus, defundReceiver.GetAddress(cardanofw.ChainIDNexus), apexDefundAndFundAmount)
-		require.NoError(t, err)
-
-		errsPerChain := waitOnDestination(ctx, apex, defundReceiver, apexDefundAndFundAmount,
-			defundReceiverPrevAmounts, defundExpectedInstances, 200, time.Second*10)
-		for chain, err := range errsPerChain {
-			require.NoError(t, err)
-			fmt.Printf("Defund on %v confirmed\n", chain)
-		}
+		require.NoError(t, defundWallets(ctx, apex, defundReceiver, apexDefundAndFundAmount,
+			defundReceiversPrevAmount, defundReceiversExpectedAmount, defundReceivers),
+		)
 
 		var wg sync.WaitGroup
 
@@ -1995,7 +2091,7 @@ func TestE2E_ApexBridge_Defund(t *testing.T) {
 				defer wg.Done()
 
 				txHash := apex.SubmitBridgingRequest(t, ctx, src, dest, sender,
-					cardanofw.ToChainNativeTokenAmount(src, apexSendAmount), receiver)
+					cardanofw.ToChainNativeTokenAmount(src, br.amount), receiver)
 				fmt.Printf("Bridging request: %v to %v sent. hash: %s\n", src, dest, txHash)
 			}(br.src, br.dest, br.sender)
 		}
@@ -2004,34 +2100,103 @@ func TestE2E_ApexBridge_Defund(t *testing.T) {
 
 		fmt.Printf("Confirming that bridging requests will not be processed\n")
 
-		errsPerChain = waitOnDestination(ctx, apex, receiver, apexSendAmount,
-			chainPrevAmounts, chainExpectedInstances, 30, time.Second*10)
+		errsPerChain := waitOnDestination(ctx, apex, chainPrevAmounts, chainExpectedAmounts, chainReceivers, 30, time.Second*10)
 		for chain, err := range errsPerChain {
 			require.Error(t, err)
-			fmt.Printf("As intended, %v TXs on %v not yet arrived\n", chainExpectedInstances[chain], chain)
+			fmt.Printf("As intended, %v TXs on %v not yet arrived\n", chainExpectedAmounts[chain], chain)
 		}
 
-		fmt.Printf("Funding hot wallets\n")
+		require.NoError(t, fundWallets(ctx, apex, apexDefundAndFundAmount))
 
-		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDPrime,
-			cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDPrime, apexDefundAndFundAmount))
-		require.NoError(t, err)
-
-		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDVector,
-			cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDVector, apexDefundAndFundAmount))
-		require.NoError(t, err)
-
-		err = apex.FundChainHotWallet(ctx, cardanofw.ChainIDNexus,
-			cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDNexus, apexDefundAndFundAmount))
-		require.NoError(t, err)
-
-		fmt.Printf("Hot wallets have been funded\n")
-
-		errsPerChain = waitOnDestination(ctx, apex, receiver, apexSendAmount,
-			chainPrevAmounts, chainExpectedInstances, 200, time.Second*10)
+		errsPerChain = waitOnDestination(ctx, apex, chainPrevAmounts, chainExpectedAmounts, chainReceivers, 200, time.Second*10)
 		for chain, err := range errsPerChain {
 			require.NoError(t, err)
-			fmt.Printf("%v TXs on %v confirmed\n", chainExpectedInstances[chain], chain)
+			fmt.Printf("%v TXs on %v confirmed\n", chainExpectedAmounts[chain], chain)
+		}
+	})
+
+	t.Run("Defund after bridging request is sent", func(t *testing.T) {
+		ctx, cncl := context.WithCancel(context.Background())
+		defer cncl()
+
+		primeConfig, vectorConfig, nexusConfig := cardanofw.NewPrimeChainConfig(),
+			cardanofw.NewVectorChainConfig(true), cardanofw.NewNexusChainConfig(true)
+		primeConfig.FundAmount = cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDPrime, initialFund).Uint64()
+		vectorConfig.FundAmount = cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDVector, initialFund).Uint64()
+		nexusConfig.FundAmount = cardanofw.ToChainNativeTokenAmount(cardanofw.ChainIDNexus, initialFund)
+
+		apex := cardanofw.SetupAndRunApexBridge(
+			t, ctx,
+			cardanofw.WithAPIKey(apiKey),
+			cardanofw.WithUserCnt(userCnt),
+			cardanofw.WithPrimeConfig(primeConfig),
+			cardanofw.WithVectorConfig(vectorConfig),
+			cardanofw.WithNexusConfig(nexusConfig),
+		)
+
+		defer require.True(t, apex.ApexBridgeProcessesRunning())
+
+		var (
+			receiver                = apex.Users[userCnt-1]
+			defundReceiver          = apex.Users[userCnt-2]
+			apexDefundAndFundAmount = big.NewInt(70)
+			apexSendAmount          = big.NewInt(50)
+
+			bridgingRequests = []*bridingRequest{
+				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDVector, sender: apex.Users[0], amount: apexSendAmount, stage: 0},
+				{src: cardanofw.ChainIDPrime, dest: cardanofw.ChainIDNexus, sender: apex.Users[1], amount: apexSendAmount, stage: 0},
+				{src: cardanofw.ChainIDNexus, dest: cardanofw.ChainIDPrime, sender: apex.Users[0], amount: apexSendAmount, stage: 0},
+			}
+
+			receivers = map[uint]*cardanofw.TestApexUser{
+				0: apex.Users[userCnt-1],
+			}
+		)
+
+		require.True(t,
+			cardanofw.ApexToDfm(apexSendAmount).Uint64()+feeAmountDfm < cardanofw.ApexToDfm(initialFund).Uint64())
+
+		chainPrevAmounts, chainExpectedAmounts, chainReceivers,
+			defundReceiversPrevAmount, defundReceiversExpectedAmount, defundReceivers :=
+			createBridgingData(ctx, apex, bridgingRequests, receivers, defundReceiver, apexDefundAndFundAmount)
+
+		// give time for oracles to submit hot wallet increment claims for initial fundings
+		time.Sleep(time.Minute)
+
+		var wg sync.WaitGroup
+
+		for _, br := range bridgingRequests {
+			wg.Add(1)
+
+			go func(src string, dest string, sender *cardanofw.TestApexUser) {
+				defer wg.Done()
+
+				txHash := apex.SubmitBridgingRequest(t, ctx, src, dest, sender,
+					cardanofw.ToChainNativeTokenAmount(src, br.amount), receiver)
+				fmt.Printf("Bridging request: %v to %v sent. hash: %s\n", src, dest, txHash)
+			}(br.src, br.dest, br.sender)
+		}
+
+		wg.Wait()
+
+		require.NoError(t, defundWallets(ctx, apex, defundReceiver, apexDefundAndFundAmount,
+			defundReceiversPrevAmount, defundReceiversExpectedAmount, defundReceivers),
+		)
+
+		fmt.Printf("Confirming that bridging requests will not be processed\n")
+
+		errsPerChain := waitOnDestination(ctx, apex, chainPrevAmounts, chainExpectedAmounts, chainReceivers, 30, time.Second*10)
+		for chain, err := range errsPerChain {
+			require.Error(t, err)
+			fmt.Printf("As intended, %v TXs on %v not yet arrived\n", chainExpectedAmounts[chain], chain)
+		}
+
+		require.NoError(t, fundWallets(ctx, apex, apexDefundAndFundAmount))
+
+		errsPerChain = waitOnDestination(ctx, apex, chainPrevAmounts, chainExpectedAmounts, chainReceivers, 200, time.Second*10)
+		for chain, err := range errsPerChain {
+			require.NoError(t, err)
+			fmt.Printf("%v TXs on %v confirmed\n", chainExpectedAmounts[chain], chain)
 		}
 	})
 }
