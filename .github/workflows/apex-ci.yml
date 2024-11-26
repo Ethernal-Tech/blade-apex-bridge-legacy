@@ -36,6 +36,10 @@ on: # yamllint disable-line rule:truthy
         description: E2E ApexBridge Skip Redundant Tests
         type: boolean
         default: true
+      apex_bridge_ref:
+        description: The branch/commit from the Apex Bridge
+        type: string
+        default: main
   workflow_call:
     inputs:
       build_blade:
@@ -64,6 +68,10 @@ on: # yamllint disable-line rule:truthy
         required: true
       e2e_apex_skip_redundant_tests:
         description: E2E ApexBridge Skip Redundant Tests
+        type: string
+        required: true
+      apex_bridge_ref:
+        description: The branch/commit from the Apex Bridge
         type: string
         required: true
     outputs:
@@ -117,18 +125,35 @@ jobs:
     if: |
       inputs.e2e_polybft_test || 
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
+    with:
+      apex_bridge_ref: ${{ inputs.apex_bridge_ref }}
     secrets:
       PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  redundant_tests_input_check:
+    name: Redundant Tests Input Check
+    runs-on: ubuntu-latest
+    outputs:
+      skip_redundant_tests: ${{ steps.check_value.outputs.skip_redundant_tests }}
+    steps:
+      - name: Check value
+        id: check_value
+        run: |
+          if [[ "${{ inputs.e2e_apex_skip_redundant_tests }}" != "false" ]]; then
+            echo "skip_redundant_tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip_redundant_tests=false" >> $GITHUB_OUTPUT
+          fi
   e2e_apex_test:
     name: E2E ApexBridge Tests
     uses: ./.github/workflows/e2e-apex-test.yml
-    needs: build_blade
+    needs: [build_blade, redundant_tests_input_check]
     if: |
       inputs.e2e_apex_test || 
       github.event_name == 'pull_request'
     with:
+      apex_bridge_ref: ${{ inputs.apex_bridge_ref }}
       e2e_apex_big_test: ${{ inputs.e2e_apex_big_test || 'false' }}
-      e2e_apex_skip_redundant_tests: ${{ fromJSON(inputs.e2e_apex_skip_redundant_tests || 'true') }}
+      e2e_apex_skip_redundant_tests: ${{ needs.redundant_tests_input_check.outputs.skip_redundant_tests }}
     secrets:
       PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   e2e_apex_test_push:
@@ -137,6 +162,7 @@ jobs:
     needs: build_blade
     if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
     with:
+      apex_bridge_ref: main
       e2e_apex_big_test: false
       e2e_apex_skip_redundant_tests: false
     secrets:
