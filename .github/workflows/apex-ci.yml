@@ -90,9 +90,6 @@ jobs:
   build_blade:
     name: Build Blade
     uses: ./.github/workflows/build.yml
-    if: |
-      github.event_name == 'pull_request' || 
-      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   lint:
     name: Lint
     uses: ./.github/workflows/lint.yml
