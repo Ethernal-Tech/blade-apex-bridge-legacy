@@ -8,10 +8,6 @@ on: # yamllint disable-line rule:truthy
   pull_request:
   workflow_dispatch:
     inputs:
-      build_blade:
-        description: Build Blade
-        type: boolean
-        default: true
       lint:
         description: Lint
         type: boolean
@@ -42,10 +38,6 @@ on: # yamllint disable-line rule:truthy
         default: main
   workflow_call:
     inputs:
-      build_blade:
-        description: Build Blade
-        type: boolean
-        required: true
       lint:
         description: Lint
         type: boolean
@@ -99,7 +91,6 @@ jobs:
     name: Build Blade
     uses: ./.github/workflows/build.yml
     if: |
-      inputs.build_blade || 
       github.event_name == 'pull_request' || 
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   lint:
