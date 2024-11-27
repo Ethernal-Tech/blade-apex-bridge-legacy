@@ -50,6 +50,8 @@ github.com/Ethernal-Tech/bn256 v0.0.0-20240711150404-47c82e53dd19 h1:a96KsZz67W/
 github.com/Ethernal-Tech/bn256 v0.0.0-20240711150404-47c82e53dd19/go.mod h1:ikj6EuZ/ISPyR1DYKnqoE5F2geyI3KzVllndxg7vFs8=
 github.com/Ethernal-Tech/cardano-infrastructure v0.0.0-20241118151934-6e8bd4af74ae h1:u4ZdT6fHOdzu30rLkoicT/boA2JDq3916Q62S8kse4s=
 github.com/Ethernal-Tech/cardano-infrastructure v0.0.0-20241118151934-6e8bd4af74ae/go.mod h1:m4KVQGs10zoSEGpL5pEdRElQFAwettiZMJhpeshqMsI=
+github.com/Ethernal-Tech/cardano-infrastructure v0.0.0-20241127134805-888c7ad5d3c4 h1:i8u2Ih8/KmZoJxOYZIyOplBG+q4v8Qbc2/GJwXzH1Mc=
+github.com/Ethernal-Tech/cardano-infrastructure v0.0.0-20241127134805-888c7ad5d3c4/go.mod h1:m4KVQGs10zoSEGpL5pEdRElQFAwettiZMJhpeshqMsI=
 github.com/Ethernal-Tech/ethgo v0.0.0-20240801172627-47215d9e504c h1:SLZer+L7G+O2VvxD3q/0r3hIpG4Orm0C5uQKSJ98CO4=
 github.com/Ethernal-Tech/ethgo v0.0.0-20240801172627-47215d9e504c/go.mod h1:YEpLAT6sQiFZIkbkRmfDklN9zb+v8O4l8DFGobuiGDY=
 github.com/Ethernal-Tech/merkle-tree v0.0.0-20231213143318-4db9da419e04 h1:DGIOHe3qAeU+mrRLNJ83mJWyH1t5SqN8XvTrwBUAXK4=
