@@ -107,7 +107,7 @@ jobs:
       github.event_name == 'pull_request' || 
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   inputs_check:
-    name: Redundant Tests Input Check
+    name: Inputs Check
     runs-on: ubuntu-latest
     outputs:
       skip_redundant_tests: ${{ steps.redudant_test_input_check.outputs.skip_redundant_tests }}
