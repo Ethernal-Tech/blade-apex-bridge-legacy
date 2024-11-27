@@ -1580,7 +1580,7 @@ func TestE2E_ApexBridge_ValidScenarios(t *testing.T) {
 	})
 }
 
-func TestE2E_ApexBridge_Fund(t *testing.T) {
+func TestE2E_ApexBridge_Fund_Defund(t *testing.T) {
 	if cardanofw.ShouldSkipE2RRedundantTests() {
 		t.Skip()
 	}
@@ -1690,7 +1690,6 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 		wg.Wait()
 	}
 
-	//nolint:dupl
 	waitOnDestination := func(
 		ctx context.Context, apex *cardanofw.ApexSystem,
 		chainPrevAmounts map[chainStageKey]*big.Int, chainExpectedAmounts map[chainStageKey]*big.Int,
@@ -1766,24 +1765,40 @@ func TestE2E_ApexBridge_Fund(t *testing.T) {
 	) error {
 		fmt.Printf("Defunding hot wallets\n")
 
-		err := apex.DefundHotWallet(
-			cardanofw.ChainIDPrime, defundReceiver.GetAddress(cardanofw.ChainIDPrime), defundAmount)
-		require.NoError(t, err)
+		var (
+			chains = []string{
+				cardanofw.ChainIDPrime,
+				cardanofw.ChainIDVector,
+				cardanofw.ChainIDNexus,
+			}
+			defundErrors = make([]error, len(chains))
+		)
 
-		err = apex.DefundHotWallet(
-			cardanofw.ChainIDVector, defundReceiver.GetAddress(cardanofw.ChainIDVector), defundAmount)
-		require.NoError(t, err)
+		var wg sync.WaitGroup
 
-		err = apex.DefundHotWallet(
-			cardanofw.ChainIDNexus, defundReceiver.GetAddress(cardanofw.ChainIDNexus), defundAmount)
-		require.NoError(t, err)
+		for idx, chainID := range chains {
+			wg.Add(1)
+
+			go func(i int) {
+				defer wg.Done()
+
+				defundErrors[i] = apex.DefundHotWallet(
+					chainID, defundReceiver.GetAddress(chainID), defundAmount)
+			}(idx)
+		}
+
+		wg.Wait()
+
+		for _, err := range defundErrors {
+			require.NoError(t, err)
+		}
 
 		errsPerChain := waitOnDestination(ctx, apex,
 			defundReceiverPrevAmounts, defundReceiverExpectedAmounts, defundReceivers,
 			200, time.Second*10)
-		for chain, err := range errsPerChain {
+		for chainKey, err := range errsPerChain {
 			require.NoError(t, err)
-			fmt.Printf("Defund on %v confirmed\n", chain)
+			fmt.Printf("Defund on %v confirmed\n", chainKey.chain)
 		}
 
 		return nil
