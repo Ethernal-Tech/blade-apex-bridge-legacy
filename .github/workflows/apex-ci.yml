@@ -106,42 +106,51 @@ jobs:
       inputs.unit_test || 
       github.event_name == 'pull_request' || 
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
-  e2e_polybft_test:
-    name: E2E PolyBFT Tests
-    uses: ./.github/workflows/e2e-polybft-test.yml
-    needs: build_blade
-    if: |
-      inputs.e2e_polybft_test || 
-      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
-    with:
-      apex_bridge_ref: ${{ inputs.apex_bridge_ref }}
-    secrets:
-      PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  redundant_tests_input_check:
+  inputs_check:
     name: Redundant Tests Input Check
     runs-on: ubuntu-latest
     outputs:
-      skip_redundant_tests: ${{ steps.check_value.outputs.skip_redundant_tests }}
+      skip_redundant_tests: ${{ steps.redudant_test_input_check.outputs.skip_redundant_tests }}
+      apex_bridge_ref: ${{ steps.apex_bridge_ref_input_check.outputs.apex_bridge_ref }}
     steps:
-      - name: Check value
-        id: check_value
+      - name: Redundant Tests Input Check
+        id: redudant_test_input_check
         run: |
           if [[ "${{ inputs.e2e_apex_skip_redundant_tests }}" != "false" ]]; then
             echo "skip_redundant_tests=true" >> $GITHUB_OUTPUT
           else
             echo "skip_redundant_tests=false" >> $GITHUB_OUTPUT
           fi
+      - name: Apex Bridge Ref Input Check
+        id: apex_bridge_ref_input_check
+        run: |
+          if [[ "${{ inputs.apex_bridge_ref }}" == "" ]]; then
+            echo "apex_bridge_ref=main" >> $GITHUB_OUTPUT
+          else
+            echo "apex_bridge_ref=${{ inputs.apex_bridge_ref }}" >> $GITHUB_OUTPUT
+          fi
+  e2e_polybft_test:
+    name: E2E PolyBFT Tests
+    uses: ./.github/workflows/e2e-polybft-test.yml
+    needs: [build_blade, inputs_check]
+    if: |
+      inputs.e2e_polybft_test || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
+    with:
+      apex_bridge_ref: ${{ needs.inputs_check.outputs.apex_bridge_ref }}
+    secrets:
+      PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   e2e_apex_test:
     name: E2E ApexBridge Tests
     uses: ./.github/workflows/e2e-apex-test.yml
-    needs: [build_blade, redundant_tests_input_check]
+    needs: [build_blade, inputs_check]
     if: |
       inputs.e2e_apex_test || 
       github.event_name == 'pull_request'
     with:
-      apex_bridge_ref: ${{ inputs.apex_bridge_ref }}
+      apex_bridge_ref: ${{ needs.inputs_check.outputs.apex_bridge_ref }}
       e2e_apex_big_test: ${{ inputs.e2e_apex_big_test || 'false' }}
-      e2e_apex_skip_redundant_tests: ${{ needs.redundant_tests_input_check.outputs.skip_redundant_tests }}
+      e2e_apex_skip_redundant_tests: ${{ needs.inputs_check.outputs.skip_redundant_tests }}
     secrets:
       PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   e2e_apex_test_push:
