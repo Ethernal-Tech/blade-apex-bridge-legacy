@@ -2,6 +2,7 @@ package cardanofw
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -13,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/types"
+	infracommon "github.com/Ethernal-Tech/cardano-infrastructure/common"
 	cardanowallet "github.com/Ethernal-Tech/cardano-infrastructure/wallet"
 	"github.com/stretchr/testify/require"
 )
@@ -40,9 +42,10 @@ type EVMChainInfo struct {
 }
 
 type ApexSystem struct {
-	BridgeCluster *framework.TestCluster
-	Config        *ApexSystemConfig
-	bladeAdmin    *crypto.ECDSAKey
+	BridgeCluster   *framework.TestCluster
+	Config          *ApexSystemConfig
+	bladeAdmin      *crypto.ECDSAKey
+	bladeProxyAdmin *crypto.ECDSAKey
 
 	validators  []*TestApexValidator
 	relayerNode *framework.Node
@@ -151,9 +154,14 @@ func (a *ApexSystem) StartBridgeChain(t *testing.T) {
 	bladeAdmin, err := crypto.GenerateECDSAKey()
 	require.NoError(t, err)
 
+	bladeProxyAdmin, err := crypto.GenerateECDSAKey()
+	require.NoError(t, err)
+
 	a.bladeAdmin = bladeAdmin
+	a.bladeProxyAdmin = bladeProxyAdmin
 	a.BridgeCluster = framework.NewTestCluster(t, a.Config.BladeValidatorCount,
 		framework.WithBladeAdmin(bladeAdmin.Address().String()),
+		framework.WithProxyContractsAdmin(bladeProxyAdmin.Address().String()),
 	)
 
 	// create validators
@@ -211,6 +219,22 @@ func (a *ApexSystem) FundWallets(ctx context.Context) error {
 	return a.execForEachChain(func(chain ITestApexChain) error {
 		return chain.FundWallets(ctx)
 	})
+}
+
+func (a *ApexSystem) FundChainHotWallet(ctx context.Context, chainID string, amount *big.Int) error {
+	chain, err := a.getChain(chainID)
+	if err != nil {
+		return err
+	}
+
+	pk, err := chain.GetAdminPrivateKey()
+	if err != nil {
+		return err
+	}
+
+	_, err = chain.SendTx(ctx, pk, chain.GetHotWalletAddress(), amount, nil)
+
+	return err
 }
 
 func (a *ApexSystem) RegisterChains() error {
@@ -273,6 +297,10 @@ func (a *ApexSystem) GetBridgeDefaultJSONRPCAddr() string {
 
 func (a *ApexSystem) GetBridgeAdmin() *crypto.ECDSAKey {
 	return a.bladeAdmin
+}
+
+func (a *ApexSystem) GetBridgeProxyAdmin() *crypto.ECDSAKey {
+	return a.bladeProxyAdmin
 }
 
 func (a *ApexSystem) GetValidatorsCount() int {
@@ -382,37 +410,69 @@ func (a *ApexSystem) GetBalance(
 func (a *ApexSystem) WaitForGreaterAmount(
 	ctx context.Context, user *TestApexUser, chain ChainID,
 	expectedAmount *big.Int, numRetries int, waitTime time.Duration,
-	isRecoverableError ...cardanowallet.IsRecoverableErrorFn,
 ) error {
-	return a.WaitForAmount(ctx, user, chain, func(val *big.Int) bool {
+	lastAmount, err := a.WaitForAmount(ctx, user, chain, func(val *big.Int) bool {
 		return val.Cmp(expectedAmount) == 1
 	}, numRetries, waitTime)
+	if err != nil {
+		return fmt.Errorf("amount mismatch: expected %s, but received %s: %w", expectedAmount, lastAmount, err)
+	}
+
+	return nil
 }
 
 func (a *ApexSystem) WaitForExactAmount(
 	ctx context.Context, user *TestApexUser, chain ChainID,
 	expectedAmount *big.Int, numRetries int, waitTime time.Duration,
-	isRecoverableError ...cardanowallet.IsRecoverableErrorFn,
 ) error {
-	return a.WaitForAmount(ctx, user, chain, func(val *big.Int) bool {
-		return val.Cmp(expectedAmount) == 0
+	lastAmount, err := a.WaitForAmount(ctx, user, chain, func(val *big.Int) bool {
+		return val.Cmp(expectedAmount) >= 0
 	}, numRetries, waitTime)
+	if err != nil {
+		return fmt.Errorf("amount mismatch: expected %s, but received %s: %w", expectedAmount, lastAmount, err)
+	} else if lastAmount.Cmp(expectedAmount) > 0 {
+		return fmt.Errorf("amount mismatch: received amount %s is greater than expected %s", lastAmount, expectedAmount)
+	}
+
+	return nil
 }
 
 func (a *ApexSystem) WaitForAmount(
 	ctx context.Context, user *TestApexUser, chain ChainID,
 	cmpHandler func(*big.Int) bool, numRetries int, waitTime time.Duration,
-	isRecoverableError ...cardanowallet.IsRecoverableErrorFn,
+) (*big.Int, error) {
+	return infracommon.ExecuteWithRetry(ctx, func(ctx context.Context) (*big.Int, error) {
+		newBalance, err := a.GetBalance(ctx, user, chain)
+		if err != nil {
+			return nil, err
+		}
+
+		if !cmpHandler(newBalance) {
+			return nil, infracommon.ErrRetryTryAgain
+		}
+
+		return newBalance, nil
+	}, infracommon.WithRetryCount(numRetries), infracommon.WithRetryWaitTime(waitTime))
+}
+
+func (a *ApexSystem) DefundHotWallet(
+	chain ChainID, defundReceiverAddress string, apexDefundAmount *big.Int,
 ) error {
-	if chain == ChainIDPrime || chain == ChainIDVector {
-		isRecoverableError = append(isRecoverableError, IsRecoverableError)
+	pkBytes, err := a.GetBridgeAdmin().MarshallPrivateKey()
+	if err != nil {
+		return err
 	}
 
-	return cardanowallet.ExecuteWithRetry(ctx, numRetries, waitTime, func() (bool, error) {
-		newBalance, err := a.GetBalance(ctx, user, chain)
+	pk := hex.EncodeToString(pkBytes)
 
-		return err == nil && cmpHandler(newBalance), err
-	}, isRecoverableError...)
+	return RunCommand(ResolveApexBridgeBinary(), []string{
+		"bridge-admin", "defund",
+		"--bridge-url", a.GetBridgeDefaultJSONRPCAddr(),
+		"--chain", chain,
+		"--amount", fmt.Sprint(ApexToDfm(apexDefundAmount)),
+		"--key", pk,
+		"--addr", defundReceiverAddress,
+	}, os.Stdout)
 }
 
 func (a *ApexSystem) SubmitTx(

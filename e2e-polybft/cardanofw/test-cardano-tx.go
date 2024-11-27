@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	infracommon "github.com/Ethernal-Tech/cardano-infrastructure/common"
 	"github.com/Ethernal-Tech/cardano-infrastructure/wallet"
 )
 
@@ -21,14 +22,10 @@ func SendTx(ctx context.Context,
 	receiver string,
 	networkType wallet.CardanoNetworkType,
 	metadata []byte,
-) (res string, err error) {
-	err = ExecuteWithRetryIfNeeded(ctx, func() error {
-		res, err = sendTx(ctx, txProvider, cardanoWallet, amount, receiver, networkType, metadata)
-
-		return err
+) (txHash string, err error) {
+	return infracommon.ExecuteWithRetry(ctx, func(ctx context.Context) (string, error) {
+		return sendTx(ctx, txProvider, cardanoWallet, amount, receiver, networkType, metadata)
 	})
-
-	return res, err
 }
 
 func sendTx(ctx context.Context,
