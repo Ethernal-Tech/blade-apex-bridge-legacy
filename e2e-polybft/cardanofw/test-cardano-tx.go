@@ -64,7 +64,11 @@ func sendTx(ctx context.Context,
 	desiredSum := amount + potentialFee + MinUTxODefaultValue
 
 	inputs, err := wallet.GetUTXOsForAmount(
-		ctx, txProvider, cardanoWalletAddr, wallet.AdaTokenName, desiredSum, desiredSum)
+		ctx, txProvider, cardanoWalletAddr,
+		[]string{wallet.AdaTokenName},
+		map[string]uint64{wallet.AdaTokenName: desiredSum},
+		map[string]uint64{wallet.AdaTokenName: desiredSum},
+	)
 	if err != nil {
 		return "", err
 	}
@@ -145,19 +149,9 @@ func CreateTx(
 		builder.SetMetaData(metadataBytes)
 	}
 
-	tokens := make([]wallet.TokenAmount, 0, len(inputs.Sum)-1)
-
-	for tokenName, tokenValue := range inputs.Sum {
-		if tokenName == wallet.AdaTokenName {
-			continue
-		}
-
-		token, err := wallet.NewTokenAmountWithFullName(tokenName, tokenValue, true)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to create token (%s, %d). err: %w", tokenName, tokenValue, err)
-		}
-
-		tokens = append(tokens, token)
+	tokens, err := wallet.GetTokensFromSumMap(inputs.Sum)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create tokens from sum map. err: %w", err)
 	}
 
 	builder.SetProtocolParameters(protocolParams).SetTimeToLive(timeToLive).
