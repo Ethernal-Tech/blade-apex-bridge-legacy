@@ -154,6 +154,10 @@ func CreateTx(
 		return nil, "", fmt.Errorf("failed to create tokens from sum map. err: %w", err)
 	}
 
+	if len(tokens) > 0 {
+		fmt.Printf("CreateTx - found tokens in inputs, rerouting to change output: %v\n", tokens)
+	}
+
 	builder.SetProtocolParameters(protocolParams).SetTimeToLive(timeToLive).
 		SetTestNetMagic(testNetMagic).
 		AddInputs(inputs.Inputs...).

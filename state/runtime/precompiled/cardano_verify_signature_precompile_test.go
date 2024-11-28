@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	MinUTxODefaultValue = uint64(1_000_000)
+	minUTxODefaultValue = uint64(1_000_000)
 )
 
 var (
@@ -232,7 +232,7 @@ func createTx(t *testing.T) ([]byte, string) {
 	outputs := []cardanowallet.TxOutput{
 		{
 			Addr:   "addr_test1vqjysa7p4mhu0l25qknwznvj0kghtr29ud7zp732ezwtzec0w8g3u",
-			Amount: MinUTxODefaultValue,
+			Amount: minUTxODefaultValue,
 		},
 	}
 	outputsSum := cardanowallet.GetOutputsSum(outputs)
@@ -253,7 +253,7 @@ func createTx(t *testing.T) ([]byte, string) {
 				Index: 2,
 			},
 		},
-		Sum: map[string]uint64{cardanowallet.AdaTokenName: MinUTxODefaultValue*2 + 20},
+		Sum: map[string]uint64{cardanowallet.AdaTokenName: minUTxODefaultValue*2 + 20},
 	}
 
 	multiSigFeeInputs := cardanowallet.TxInputs{
@@ -263,7 +263,7 @@ func createTx(t *testing.T) ([]byte, string) {
 				Index: 0,
 			},
 		},
-		Sum: map[string]uint64{cardanowallet.AdaTokenName: MinUTxODefaultValue * 2},
+		Sum: map[string]uint64{cardanowallet.AdaTokenName: minUTxODefaultValue * 2},
 	}
 
 	builder.SetTimeToLive(ttl).SetProtocolParameters(protocolParameters)
