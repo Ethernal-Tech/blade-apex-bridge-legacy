@@ -1582,7 +1582,7 @@ func TestE2E_ApexBridge_ValidScenarios(t *testing.T) {
 
 func TestE2E_ApexBridge_Fund_Defund(t *testing.T) {
 	if cardanofw.ShouldSkipE2RRedundantTests() {
-		t.Skip()
+		// t.Skip()
 	}
 
 	const (
