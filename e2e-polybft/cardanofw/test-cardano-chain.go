@@ -287,7 +287,9 @@ func (ec *TestCardanoChain) GetAddressBalance(ctx context.Context, addr string) 
 		return nil, err
 	}
 
-	return new(big.Int).SetUint64(infrawallet.GetUtxosSum(utxos)), nil
+	sum := infrawallet.GetUtxosSum(utxos)
+
+	return new(big.Int).SetUint64(sum[infrawallet.AdaTokenName]), nil
 }
 
 func (ec *TestCardanoChain) BridgingRequest(
@@ -371,5 +373,5 @@ func (ec *TestCardanoChain) GetAdminPrivateKey() (string, error) {
 		return "", err
 	}
 
-	return hex.EncodeToString(genesisWallet.GetSigningKey()), nil
+	return hex.EncodeToString(genesisWallet.SigningKey), nil
 }

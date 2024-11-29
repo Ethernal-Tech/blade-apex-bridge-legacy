@@ -17,7 +17,7 @@ const (
 
 func SendTx(ctx context.Context,
 	txProvider wallet.ITxProvider,
-	cardanoWallet wallet.IWallet,
+	cardanoWallet *wallet.Wallet,
 	amount uint64,
 	receiver string,
 	networkType wallet.CardanoNetworkType,
@@ -30,7 +30,7 @@ func SendTx(ctx context.Context,
 
 func sendTx(ctx context.Context,
 	txProvider wallet.ITxProvider,
-	cardanoWallet wallet.IWallet,
+	cardanoWallet *wallet.Wallet,
 	amount uint64,
 	receiver string,
 	networkType wallet.CardanoNetworkType,
@@ -61,10 +61,14 @@ func sendTx(ctx context.Context,
 			Amount: amount,
 		},
 	}
-	desiredSum := amount + potentialFee + wallet.MinUTxODefaultValue
+	desiredSum := amount + potentialFee + MinUTxODefaultValue
 
 	inputs, err := wallet.GetUTXOsForAmount(
-		ctx, txProvider, cardanoWalletAddr, desiredSum, desiredSum)
+		ctx, txProvider, cardanoWalletAddr,
+		[]string{wallet.AdaTokenName},
+		map[string]uint64{wallet.AdaTokenName: desiredSum},
+		map[string]uint64{wallet.AdaTokenName: desiredSum},
+	)
 	if err != nil {
 		return "", err
 	}
@@ -73,17 +77,19 @@ func sendTx(ctx context.Context,
 		cardanoCliBinary,
 		networkTestMagic, protocolParams,
 		qtd.Slot+ttlSlotNumberInc, metadata,
-		outputs, inputs, cardanoWalletAddr)
+		outputs, inputs, cardanoWalletAddr, MinUTxODefaultValue)
 	if err != nil {
 		return "", err
 	}
 
-	witness, err := wallet.CreateTxWitness(txHash, cardanoWallet)
+	txBilder, err := wallet.NewTxBuilder(cardanoCliBinary)
 	if err != nil {
 		return "", err
 	}
 
-	signedTx, err := AssembleTxWitnesses(cardanoCliBinary, rawTx, [][]byte{witness})
+	defer txBilder.Dispose()
+
+	signedTx, err := txBilder.SignTx(rawTx, []wallet.ITxSigner{cardanoWallet})
 	if err != nil {
 		return "", err
 	}
@@ -94,7 +100,7 @@ func sendTx(ctx context.Context,
 func GetGenesisWalletFromCluster(
 	dirPath string,
 	keyID uint,
-) (wallet.IWallet, error) {
+) (*wallet.Wallet, error) {
 	keyFileName := strings.Join([]string{"utxo", fmt.Sprint(keyID)}, "")
 
 	sKey, err := wallet.NewKey(filepath.Join(dirPath, "utxo-keys", fmt.Sprintf("%s.skey", keyFileName)))
@@ -130,8 +136,9 @@ func CreateTx(
 	outputs []wallet.TxOutput,
 	inputs wallet.TxInputs,
 	changeAddress string,
+	minUTxODefaultValue uint64,
 ) ([]byte, string, error) {
-	outputsSum := wallet.GetOutputsSum(outputs)
+	outputsSum := wallet.GetOutputsSum(outputs)[wallet.AdaTokenName]
 
 	builder, err := wallet.NewTxBuilder(cardanoCliBinary)
 	if err != nil {
@@ -144,47 +151,36 @@ func CreateTx(
 		builder.SetMetaData(metadataBytes)
 	}
 
+	tokens, err := wallet.GetTokensFromSumMap(inputs.Sum)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create tokens from sum map. err: %w", err)
+	}
+
+	if len(tokens) > 0 {
+		fmt.Printf("CreateTx - found tokens in inputs, rerouting to change output: %v\n", tokens)
+	}
+
 	builder.SetProtocolParameters(protocolParams).SetTimeToLive(timeToLive).
 		SetTestNetMagic(testNetMagic).
 		AddInputs(inputs.Inputs...).
-		AddOutputs(outputs...).AddOutputs(wallet.TxOutput{Addr: changeAddress})
+		AddOutputs(outputs...).AddOutputs(wallet.TxOutput{Addr: changeAddress, Tokens: tokens})
 
 	fee, err := builder.CalculateFee(0)
 	if err != nil {
 		return nil, "", err
 	}
 
-	change := inputs.Sum - outputsSum - fee
+	inputsAdaSum := inputs.Sum[wallet.AdaTokenName]
+	change := inputsAdaSum - outputsSum - fee
 	// handle overflow or insufficient amount
-	if change > inputs.Sum || (change > 0 && change < wallet.MinUTxODefaultValue) {
+	if change > inputsAdaSum || change < minUTxODefaultValue {
 		return []byte{}, "", fmt.Errorf("insufficient amount %d for %d or min utxo not satisfied",
-			inputs.Sum, outputsSum+fee)
+			inputsAdaSum, outputsSum+fee)
 	}
 
-	if change == 0 {
-		builder.RemoveOutput(-1)
-	} else {
-		builder.UpdateOutputAmount(-1, change)
-	}
+	builder.UpdateOutputAmount(-1, change)
 
 	builder.SetFee(fee)
 
 	return builder.Build()
-}
-
-// CreateTxWitness creates cbor of vkey+signature pair of tx hash
-func CreateTxWitness(txHash string, key wallet.ISigner) ([]byte, error) {
-	return wallet.CreateTxWitness(txHash, key)
-}
-
-// AssembleTxWitnesses assembles all witnesses in final cbor of signed tx
-func AssembleTxWitnesses(cardanoCliBinary string, txRaw []byte, witnesses [][]byte) ([]byte, error) {
-	builder, err := wallet.NewTxBuilder(cardanoCliBinary)
-	if err != nil {
-		return nil, err
-	}
-
-	defer builder.Dispose()
-
-	return builder.AssembleTxWitnesses(txRaw, witnesses)
 }

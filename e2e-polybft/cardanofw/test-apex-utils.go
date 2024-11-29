@@ -27,6 +27,8 @@ const (
 	BatchStateIncludedInBatch           = "IncludedInBatch"
 	BatchStateExecuted                  = "ExecutedOnDestination"
 	BridgingRequestStatusInvalidRequest = "InvalidRequest"
+
+	MinUTxODefaultValue = uint64(1_000_000)
 )
 
 func ResolveCardanoCliBinary(networkID wallet.CardanoNetworkType) string {
@@ -246,13 +248,13 @@ func GetNetworkName(networkType wallet.CardanoNetworkType) string {
 	}
 }
 
-func GetAddress(networkType wallet.CardanoNetworkType, cardanoWallet wallet.IWallet) (wallet.CardanoAddress, error) {
-	if len(cardanoWallet.GetStakeVerificationKey()) > 0 {
+func GetAddress(networkType wallet.CardanoNetworkType, cardanoWallet *wallet.Wallet) (wallet.CardanoAddress, error) {
+	if len(cardanoWallet.StakeVerificationKey) > 0 {
 		return wallet.NewBaseAddress(networkType,
-			cardanoWallet.GetVerificationKey(), cardanoWallet.GetStakeVerificationKey())
+			cardanoWallet.VerificationKey, cardanoWallet.StakeVerificationKey)
 	}
 
-	return wallet.NewEnterpriseAddress(networkType, cardanoWallet.GetVerificationKey())
+	return wallet.NewEnterpriseAddress(networkType, cardanoWallet.VerificationKey)
 }
 
 func GetTestNetMagicArgs(testnetMagic uint) []string {
