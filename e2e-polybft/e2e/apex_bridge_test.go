@@ -1582,7 +1582,7 @@ func TestE2E_ApexBridge_ValidScenarios(t *testing.T) {
 
 func TestE2E_ApexBridge_Fund_Defund(t *testing.T) {
 	if cardanofw.ShouldSkipE2RRedundantTests() {
-		// t.Skip()
+		t.Skip()
 	}
 
 	const (
@@ -2033,9 +2033,7 @@ func TestE2E_ApexBridge_Fund_Defund(t *testing.T) {
 			createBridgingData(ctx, apex, bridgingRequests, receivers, defundReceiver, apexDefundAndFundAmount)
 
 		for _, request := range bridgingRequests {
-			requests := []*bridingRequest{request}
-
-			bridgeTransactions(ctx, apex, requests, receivers)
+			bridgeTransactions(ctx, apex, []*bridingRequest{request}, receivers)
 
 			require.NoError(t, apex.DefundHotWallet(
 				request.dest, defundReceiver.GetAddress(request.dest), apexDefundAndFundAmount))
