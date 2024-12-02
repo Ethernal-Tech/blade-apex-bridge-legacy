@@ -12,15 +12,16 @@ import (
 )
 
 type TestApexUser struct {
-	PrimeWallet   wallet.IWallet
-	VectorWallet  wallet.IWallet
+	PrimeWallet   *wallet.Wallet
+	VectorWallet  *wallet.Wallet
 	PrimeAddress  string
 	VectorAddress string
 }
 
 type BridgingRequestMetadataTransaction struct {
-	Address []string `cbor:"a" json:"a"`
-	Amount  uint64   `cbor:"m" json:"m"`
+	Address     []string `cbor:"a" json:"a"`
+	Amount      uint64   `cbor:"m" json:"m"`
+	TokenAmount uint64   `cbor:"nt" json:"nt"`
 }
 
 func NewTestApexUser(
@@ -83,7 +84,7 @@ func NewTestApexUserWithExistingWallets(t *testing.T, primePrivateKey, vectorPri
 func (u *TestApexUser) SendToUser(
 	t *testing.T,
 	ctx context.Context, txProvider wallet.ITxProvider,
-	sender wallet.IWallet, sendAmount uint64,
+	sender *wallet.Wallet, sendAmount uint64,
 	networkConfig TestCardanoNetworkConfig,
 ) {
 	t.Helper()
@@ -110,7 +111,7 @@ func (u *TestApexUser) SendToUser(
 func (u *TestApexUser) SendToAddress(
 	t *testing.T,
 	ctx context.Context, txProvider wallet.ITxProvider,
-	sender wallet.IWallet, sendAmount uint64,
+	sender *wallet.Wallet, sendAmount uint64,
 	receiver string, networkConfig TestCardanoNetworkConfig,
 ) {
 	t.Helper()
@@ -129,6 +130,7 @@ func (u *TestApexUser) SendToAddress(
 	require.NoError(t, err)
 }
 
+// Bridge Ada -> Native Token
 func (u *TestApexUser) BridgeAmount(
 	t *testing.T, ctx context.Context,
 	txProvider wallet.ITxProvider,
@@ -151,6 +153,30 @@ func (u *TestApexUser) BridgeAmount(
 	return txHash
 }
 
+func (u *TestApexUser) BridgeNativeTokenAmount(
+	t *testing.T, ctx context.Context,
+	txProvider wallet.ITxProvider,
+	multisigAddr, feeAddr string, sendAmount uint64,
+	networkConfig TestCardanoNetworkConfig,
+	receiver string,
+	policyScript wallet.PolicyScript,
+) string {
+	t.Helper()
+
+	sender := u.PrimeWallet
+	// receiverAddr := u.VectorAddress
+
+	if !networkConfig.IsPrime() {
+		sender = u.VectorWallet
+		// receiverAddr = u.PrimeAddress
+	}
+
+	txHash := BridgeNativeTokenAmountFull(t, ctx, txProvider, networkConfig,
+		multisigAddr, feeAddr, sender, receiver, sendAmount, policyScript)
+
+	return txHash
+}
+
 func (u *TestApexUser) BridgeNexusAmount(
 	t *testing.T, ctx context.Context,
 	txProvider wallet.ITxProvider,
@@ -168,14 +194,16 @@ func (u *TestApexUser) BridgeNexusAmount(
 	)
 }
 
+// DN_TODO Check if metadata can be used to create two differnet brdiging requests, one for minting and one for ada transfer
 func CreateMetaData(
 	sender string, receivers map[string]uint64, destinationChainID string, feeAmount uint64,
 ) ([]byte, error) {
 	var transactions = make([]BridgingRequestMetadataTransaction, 0, len(receivers))
 	for addr, amount := range receivers {
 		transactions = append(transactions, BridgingRequestMetadataTransaction{
-			Address: SplitString(addr, 40),
-			Amount:  amount,
+			Address:     SplitString(addr, 40),
+			Amount:      amount,
+			TokenAmount: 0,
 		})
 	}
 
@@ -192,9 +220,34 @@ func CreateMetaData(
 	return json.Marshal(metadata)
 }
 
+func CreateMetaDataNativeToken(
+	sender string, receivers map[string]uint64, destinationChainID string, feeAmount uint64,
+) ([]byte, error) {
+	var transactions = make([]BridgingRequestMetadataTransaction, 0, len(receivers))
+	for addr, amount := range receivers {
+		transactions = append(transactions, BridgingRequestMetadataTransaction{
+			Address:     SplitString(addr, 40),
+			Amount:      wallet.MinUTxODefaultValue,
+			TokenAmount: amount,
+		})
+	}
+
+	metadata := map[string]interface{}{
+		"1": map[string]interface{}{
+			"t":  "bridgent",
+			"d":  destinationChainID,
+			"s":  SplitString(sender, 40),
+			"tx": transactions,
+			"fa": feeAmount,
+		},
+	}
+
+	return json.Marshal(metadata)
+}
+
 func BridgeAmountFull(
 	t *testing.T, ctx context.Context, txProvider wallet.ITxProvider,
-	networkConfig TestCardanoNetworkConfig, multisigAddr, feeAddr string, sender wallet.IWallet,
+	networkConfig TestCardanoNetworkConfig, multisigAddr, feeAddr string, sender *wallet.Wallet,
 	receiverAddr string, sendAmount uint64,
 ) string {
 	t.Helper()
@@ -205,10 +258,67 @@ func BridgeAmountFull(
 	)
 }
 
+func BridgeNativeTokenAmountFull(
+	t *testing.T, ctx context.Context, txProvider wallet.ITxProvider,
+	networkConfig TestCardanoNetworkConfig, multisigAddr, feeAddr string, sender *wallet.Wallet,
+	receiverAddr string, sendAmount uint64, policyScript wallet.PolicyScript,
+) string {
+	t.Helper()
+
+	return BridgeNativeTokenAmountFullMultipleReceivers(
+		t, ctx, txProvider, networkConfig, multisigAddr, feeAddr, sender,
+		[]string{receiverAddr}, sendAmount, policyScript,
+	)
+}
+
 func BridgeAmountFullMultipleReceivers(
 	t *testing.T, ctx context.Context, txProvider wallet.ITxProvider, networkConfig TestCardanoNetworkConfig,
-	multisigAddr, feeAddr string, sender wallet.IWallet,
+	multisigAddr, feeAddr string, sender *wallet.Wallet,
 	receiverAddrs []string, sendAmount uint64,
+) string {
+	t.Helper()
+
+	require.Greater(t, len(receiverAddrs), 0)
+	require.Less(t, len(receiverAddrs), 5)
+
+	const feeAmount = 1_100_000
+
+	senderAddr, err := GetAddress(networkConfig.NetworkType, sender)
+	require.NoError(t, err)
+
+	receivers := make(map[string]uint64, len(receiverAddrs))
+	for _, receiverAddr := range receiverAddrs {
+		receivers[receiverAddr] = sendAmount
+		// receivers[receiverAddr] = sendAmount + wallet.MinUTxODefaultValue
+	}
+
+	// bridgingRequestMetadata, err := CreateMetaData(
+	// 	senderAddr.String(), receivers, GetDestinationChainID(networkConfig), feeAmount)
+	// require.NoError(t, err)
+
+	bridgingRequestMetadata, err := CreateMetaDataNativeToken(
+		senderAddr.String(), receivers, GetDestinationChainID(networkConfig), feeAmount)
+	require.NoError(t, err)
+
+	// totalSendAmount := uint64(len(receiverAddrs))*(sendAmount+wallet.MinUTxODefaultValue) + feeAmount
+	totalSendAmount := uint64(len(receiverAddrs))*(wallet.MinUTxODefaultValue) + feeAmount
+
+	fmt.Printf("DN_LOG_TAG multisigAddr addr: %s\n", multisigAddr)
+
+	txHash, err := SendTx(ctx, txProvider, sender, totalSendAmount, multisigAddr, networkConfig, bridgingRequestMetadata)
+	require.NoError(t, err)
+
+	err = wallet.WaitForTxHashInUtxos(
+		context.Background(), txProvider, multisigAddr, txHash, 200, time.Second*2, IsRecoverableError)
+	require.NoError(t, err)
+
+	return txHash
+}
+
+func BridgeNativeTokenAmountFullMultipleReceivers(
+	t *testing.T, ctx context.Context, txProvider wallet.ITxProvider, networkConfig TestCardanoNetworkConfig,
+	multisigAddr, feeAddr string, sender *wallet.Wallet,
+	receiverAddrs []string, sendAmount uint64, policyScript wallet.PolicyScript,
 ) string {
 	t.Helper()
 
@@ -229,8 +339,8 @@ func BridgeAmountFullMultipleReceivers(
 		senderAddr.String(), receivers, GetDestinationChainID(networkConfig), feeAmount)
 	require.NoError(t, err)
 
-	txHash, err := SendTx(ctx, txProvider, sender,
-		uint64(len(receiverAddrs))*sendAmount+feeAmount, multisigAddr, networkConfig, bridgingRequestMetadata)
+	txHash, err := SendTxNativeTokens(ctx, txProvider, sender,
+		uint64(len(receiverAddrs))*sendAmount+feeAmount, multisigAddr, networkConfig, bridgingRequestMetadata, policyScript)
 	require.NoError(t, err)
 
 	err = wallet.WaitForTxHashInUtxos(
@@ -242,7 +352,7 @@ func BridgeAmountFullMultipleReceivers(
 
 func BridgeAmountFullMultipleReceiversNexus(
 	ctx context.Context, txProvider wallet.ITxProvider, networkConfig TestCardanoNetworkConfig,
-	multisigAddr, feeAddr string, sender wallet.IWallet,
+	multisigAddr, feeAddr string, sender *wallet.Wallet,
 	receiverAddrs []string, sendAmount uint64,
 ) (string, error) {
 	const (

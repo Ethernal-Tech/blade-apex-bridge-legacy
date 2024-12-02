@@ -63,8 +63,8 @@ func Test_OnlyRunApexBridge_WithNexusAndVector(t *testing.T) {
 
 	user := apex.CreateAndFundUser(t, ctx, uint64(500_000_000))
 
-	primeUserSKHex := hex.EncodeToString(user.PrimeWallet.GetSigningKey())
-	vectorUserSKHex := hex.EncodeToString(user.VectorWallet.GetSigningKey())
+	primeUserSKHex := hex.EncodeToString(user.PrimeWallet.SigningKey)
+	vectorUserSKHex := hex.EncodeToString(user.VectorWallet.SigningKey)
 
 	fmt.Printf("user prime addr: %s\n", user.PrimeAddress)
 	fmt.Printf("user prime signing key hex: %s\n", primeUserSKHex)
@@ -392,7 +392,7 @@ func TestE2E_ApexBridge_InvalidScenarios(t *testing.T) {
 		var err error
 
 		instances := 5
-		walletKeys := make([]wallet.IWallet, instances)
+		walletKeys := make([]*wallet.Wallet, instances)
 		txHashes := make([]string, instances)
 		primeGenesisWallet := apex.GetPrimeGenesisWallet(t)
 
@@ -627,8 +627,8 @@ func TestE2E_ApexBridge_ValidScenarios(t *testing.T) {
 
 	var (
 		err                error
-		walletKeysPrime    = make([]wallet.IWallet, maxParallelInstances)
-		walletKeysVector   = make([]wallet.IWallet, maxParallelInstances)
+		walletKeysPrime    = make([]*wallet.Wallet, maxParallelInstances)
+		walletKeysVector   = make([]*wallet.Wallet, maxParallelInstances)
 		primeClusterConfig = &cardanofw.RunCardanoClusterConfig{
 			ID:                 0,
 			NodesCount:         4,
@@ -655,10 +655,10 @@ func TestE2E_ApexBridge_ValidScenarios(t *testing.T) {
 		walletKeysVector[i], err = wallet.GenerateWallet(false)
 		require.NoError(t, err)
 
-		addrPrime, err := wallet.NewEnterpriseAddress(primeClusterConfig.NetworkType, walletKeysPrime[i].GetVerificationKey())
+		addrPrime, err := wallet.NewEnterpriseAddress(primeClusterConfig.NetworkType, walletKeysPrime[i].VerificationKey)
 		require.NoError(t, err)
 
-		addrVec, err := wallet.NewEnterpriseAddress(vectorClusterConfig.NetworkType, walletKeysVector[i].GetVerificationKey())
+		addrVec, err := wallet.NewEnterpriseAddress(vectorClusterConfig.NetworkType, walletKeysVector[i].VerificationKey)
 		require.NoError(t, err)
 
 		primeClusterConfig.InitialFundsKeys[i] = hex.EncodeToString(addrPrime.Bytes())
@@ -915,7 +915,7 @@ func TestE2E_ApexBridge_ValidScenarios(t *testing.T) {
 
 		var (
 			wg                           sync.WaitGroup
-			destinationWalletKeys        = make([]wallet.IWallet, receivers)
+			destinationWalletKeys        = make([]*wallet.Wallet, receivers)
 			destinationWalletAddresses   = make([]string, receivers)
 			destinationWalletPrevAmounts = make([]uint64, receivers)
 		)
@@ -1357,7 +1357,7 @@ func TestE2E_ApexBridge_ValidScenarios_BigTests(t *testing.T) {
 		sendAmount := uint64(1_000_000)
 		successChance := 90 // 90%
 		succeededCount := 0
-		walletKeys := make([]wallet.IWallet, instances)
+		walletKeys := make([]*wallet.Wallet, instances)
 
 		prevAmount, err := cardanofw.GetTokenAmount(ctx, txProviderVector, user.VectorAddress)
 		require.NoError(t, err)
@@ -1444,7 +1444,7 @@ func TestE2E_ApexBridge_ValidScenarios_BigTests(t *testing.T) {
 		sendAmount := uint64(1_000_000)
 		successChance := 90 // 90%
 		succeededCount := 0
-		walletKeys := make([]wallet.IWallet, instances)
+		walletKeys := make([]*wallet.Wallet, instances)
 
 		prevAmount, err := cardanofw.GetTokenAmount(ctx, txProviderVector, user.VectorAddress)
 		require.NoError(t, err)
@@ -1530,8 +1530,8 @@ func TestE2E_ApexBridge_ValidScenarios_BigTests(t *testing.T) {
 		successChance := 90 // 90%
 		succeededCountPrime := 0
 		succeededCountVector := 0
-		walletKeysPrime := make([]wallet.IWallet, instances)
-		walletKeysVector := make([]wallet.IWallet, instances)
+		walletKeysPrime := make([]*wallet.Wallet, instances)
+		walletKeysVector := make([]*wallet.Wallet, instances)
 
 		prevAmountPrime, err := cardanofw.GetTokenAmount(ctx, txProviderVector, user.VectorAddress)
 		require.NoError(t, err)

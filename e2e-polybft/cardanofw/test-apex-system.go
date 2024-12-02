@@ -217,7 +217,7 @@ func (a *ApexSystem) StartApexCentralized(t *testing.T) {
 	}
 }
 
-func (a *ApexSystem) GetPrimeGenesisWallet(t *testing.T) cardanowallet.IWallet {
+func (a *ApexSystem) GetPrimeGenesisWallet(t *testing.T) *cardanowallet.Wallet {
 	t.Helper()
 
 	result, err := GetGenesisWalletFromCluster(a.PrimeCluster.Config.TmpDir, 2)
@@ -226,7 +226,7 @@ func (a *ApexSystem) GetPrimeGenesisWallet(t *testing.T) cardanowallet.IWallet {
 	return result
 }
 
-func (a *ApexSystem) GetVectorGenesisWallet(t *testing.T) cardanowallet.IWallet {
+func (a *ApexSystem) GetVectorGenesisWallet(t *testing.T) *cardanowallet.Wallet {
 	t.Helper()
 
 	result, err := GetGenesisWalletFromCluster(a.VectorCluster.Config.TmpDir, 2)
@@ -693,6 +693,7 @@ func (a *ApexSystem) FundCardanoMultisigAddresses(
 	fmt.Printf("Prime fee addr funded: %s\n", txHash)
 
 	if a.Config.VectorEnabled {
+		fmt.Printf("DN_LOG_TAG addr addr: %s\n", a.VectorMultisigAddr)
 		txHash, err := fund(a.VectorCluster, fundTokenAmount, a.VectorMultisigAddr)
 		if err != nil {
 			return err
@@ -720,8 +721,10 @@ func (a *ApexSystem) CreateCardanoMultisigAddresses() (err error) {
 	if a.Config.VectorEnabled {
 		a.VectorMultisigAddr, a.VectorMultisigFeeAddr, err = a.cardanoCreateAddress(a.VectorCluster.Config.NetworkType, nil)
 		if err != nil {
+			fmt.Printf("DN_LOG_TAG error: failed to create addresses for vector: %+v\n", err)
 			return fmt.Errorf("failed to create addresses for vector: %w", err)
 		}
+		fmt.Printf("DN_LOG_TAG addr addr: %s %s\n", a.VectorMultisigAddr, a.VectorMultisigFeeAddr)
 	}
 
 	return nil
@@ -736,7 +739,7 @@ func (a *ApexSystem) CreateCardanoAddresses() (err error) {
 	}
 
 	a.PrimeMultisigAddr, _, err = a.cardanoCreateAddress(a.PrimeCluster.Config.NetworkType,
-		[]string{hex.EncodeToString(cw.GetVerificationKey()), hex.EncodeToString(cw.GetSigningKey())})
+		[]string{hex.EncodeToString(cw.VerificationKey), hex.EncodeToString(cw.SigningKey)})
 	if err != nil {
 		return fmt.Errorf("failed to create prime address: %w", err)
 	}
@@ -750,7 +753,7 @@ func (a *ApexSystem) CreateCardanoAddresses() (err error) {
 	}
 
 	a.PrimeMultisigFeeAddr, _, err = a.cardanoCreateAddress(a.PrimeCluster.Config.NetworkType,
-		[]string{hex.EncodeToString(cfw.GetVerificationKey()), hex.EncodeToString(cfw.GetSigningKey())})
+		[]string{hex.EncodeToString(cfw.VerificationKey), hex.EncodeToString(cfw.SigningKey)})
 	if err != nil {
 		return fmt.Errorf("failed to create prime fee address: %w", err)
 	}
@@ -763,11 +766,20 @@ func (a *ApexSystem) CreateCardanoAddresses() (err error) {
 		return fmt.Errorf("failed to create vector wallet: %w", err)
 	}
 
-	a.VectorMultisigAddr, _, err = a.cardanoCreateAddress(a.VectorCluster.Config.NetworkType,
-		[]string{hex.EncodeToString(vw.GetVerificationKey())})
+	fmt.Printf("DN_LOG_TAG a.VectorCluster.Config.NetworkType %+v\n", a.VectorCluster.Config.NetworkType)
+	// a.VectorMultisigAddr, _, err = a.cardanoCreateAddress(a.VectorCluster.Config.NetworkType,
+	// 	[]string{hex.EncodeToString(vw.VerificationKey), hex.EncodeToString(vw.SigningKey)})
+	// if err != nil {
+	// 	return fmt.Errorf("failed to create vector address: %w", err)
+	// }
+
+	addrVec, err := cardanowallet.NewEnterpriseAddress(a.VectorCluster.Config.NetworkType,
+		vw.VerificationKey)
 	if err != nil {
-		return fmt.Errorf("failed to create vector address: %w", err)
+		return fmt.Errorf("failed to create vector fee address: %w", err)
 	}
+
+	a.VectorMultisigAddr = addrVec.String()
 
 	a.vsk = hex.EncodeToString(vw.SigningKey)
 	a.vvk = hex.EncodeToString(vw.VerificationKey)
@@ -777,14 +789,21 @@ func (a *ApexSystem) CreateCardanoAddresses() (err error) {
 		return fmt.Errorf("failed to create vector wallet: %w", err)
 	}
 
-	a.VectorMultisigFeeAddr, _, err = a.cardanoCreateAddress(a.VectorCluster.Config.NetworkType,
-		[]string{hex.EncodeToString(vfw.GetVerificationKey())})
+	// a.VectorMultisigFeeAddr, _, err = a.cardanoCreateAddress(a.VectorCluster.Config.NetworkType,
+	// 	[]string{hex.EncodeToString(vfw.VerificationKey), hex.EncodeToString(vfw.SigningKey)})
+
+	addrFVec, err := cardanowallet.NewEnterpriseAddress(a.VectorCluster.Config.NetworkType,
+		vfw.VerificationKey)
 	if err != nil {
 		return fmt.Errorf("failed to create vector fee address: %w", err)
 	}
 
+	a.VectorMultisigFeeAddr = addrFVec.String()
+
 	a.vfsk = hex.EncodeToString(vfw.SigningKey)
 	a.vfvk = hex.EncodeToString(vfw.VerificationKey)
+
+	fmt.Printf("DN_LOG_TAG addr addr: %s %s\n", a.VectorMultisigAddr, a.VectorMultisigFeeAddr)
 
 	return nil
 }
@@ -845,4 +864,8 @@ func (a *ApexSystem) cardanoCreateAddress(
 	}
 
 	return multisig, fee, nil
+}
+
+func (a *ApexSystem) GetPrimeMSigVerificationKey() string {
+	return a.pvk
 }

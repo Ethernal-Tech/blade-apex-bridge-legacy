@@ -332,11 +332,32 @@ func GetTokenAmount(ctx context.Context, txProvider wallet.ITxProvider, addr str
 		return 0, err
 	}
 
-	return wallet.GetUtxosSum(utxos), nil
+	return wallet.GetUtxosSum(utxos)["lovelace"], nil
+}
+
+func GetNativeTokenAmount(ctx context.Context, txProvider wallet.ITxProvider, addr string) (uint64, error) {
+	var utxos []wallet.Utxo
+
+	err := ExecuteWithRetryIfNeeded(ctx, func() (err error) {
+		utxos, err = txProvider.GetUtxos(ctx, addr)
+
+		return err
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return wallet.GetUtxosSum(utxos)["lovelace"], nil
 }
 
 // WaitForAmount waits for address to have amount specified by cmpHandler
 func WaitForAmount(ctx context.Context, txRetriever wallet.IUTxORetriever,
+	addr string, cmpHandler func(uint64) bool, numRetries int, waitTime time.Duration,
+) error {
+	return wallet.WaitForAmount(ctx, txRetriever, addr, cmpHandler, numRetries, waitTime, IsRecoverableError)
+}
+
+func WaitForNativeTokenAmount(ctx context.Context, txRetriever wallet.IUTxORetriever,
 	addr string, cmpHandler func(uint64) bool, numRetries int, waitTime time.Duration,
 ) error {
 	return wallet.WaitForAmount(ctx, txRetriever, addr, cmpHandler, numRetries, waitTime, IsRecoverableError)
@@ -401,13 +422,13 @@ func GetNetworkName(networkType wallet.CardanoNetworkType) string {
 	}
 }
 
-func GetAddress(networkType wallet.CardanoNetworkType, cardanoWallet wallet.IWallet) (wallet.CardanoAddress, error) {
-	if len(cardanoWallet.GetStakeVerificationKey()) > 0 {
+func GetAddress(networkType wallet.CardanoNetworkType, cardanoWallet *wallet.Wallet) (wallet.CardanoAddress, error) {
+	if len(cardanoWallet.StakeVerificationKey) > 0 {
 		return wallet.NewBaseAddress(networkType,
-			cardanoWallet.GetVerificationKey(), cardanoWallet.GetStakeVerificationKey())
+			cardanoWallet.VerificationKey, cardanoWallet.StakeVerificationKey)
 	}
 
-	return wallet.NewEnterpriseAddress(networkType, cardanoWallet.GetVerificationKey())
+	return wallet.NewEnterpriseAddress(networkType, cardanoWallet.VerificationKey)
 }
 
 func GetTestNetMagicArgs(testnetMagic uint) []string {
