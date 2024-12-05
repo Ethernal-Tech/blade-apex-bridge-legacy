@@ -31,7 +31,7 @@ on: # yamllint disable-line rule:truthy
       e2e_apex_skip_redundant_tests:
         description: E2E ApexBridge Skip Redundant Tests
         type: boolean
-        default: true
+        default: false
       apex_bridge_ref:
         description: The branch/commit from the Apex Bridge
         type: string
